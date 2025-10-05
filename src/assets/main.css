@@ -188,5 +188,9 @@
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+
+    /* Ajustar tamaño base según la demo */
+    font-size: 14px;
+    line-height: 20px;
   }
 }

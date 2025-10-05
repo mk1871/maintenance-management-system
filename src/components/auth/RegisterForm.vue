@@ -10,63 +10,69 @@
           <div class="space-y-4">
             <!-- Full Name field -->
             <div>
-              <Label for="fullName" class="text-right">Nombre Completo</Label>
+              <Label class="text-right" for="fullName">Nombre Completo</Label>
               <Input
                 id="fullName"
                 v-model="fullName"
-                type="text"
-                required
                 :class="{ 'border-destructive': errors.fullName }"
-                @blur="validateField('fullName')"
                 placeholder="Nombre Apellido"
+                required
+                type="text"
+                @blur="validateField('fullName')"
               />
-              <p v-if="errors.fullName" class="mt-1 text-sm text-destructive">{{ errors.fullName }}</p>
+              <p v-if="errors.fullName" class="mt-1 text-sm text-destructive">
+                {{ errors.fullName }}
+              </p>
             </div>
 
             <!-- Email field -->
             <div>
-              <Label for="email" class="text-right">Email</Label>
+              <Label class="text-right" for="email">Email</Label>
               <Input
                 id="email"
                 v-model="email"
-                type="email"
-                autocomplete="email"
-                required
                 :class="{ 'border-destructive': errors.email }"
-                @blur="validateField('email')"
+                autocomplete="email"
                 placeholder="nombre@ejemplo.com"
+                required
+                type="email"
+                @blur="validateField('email')"
               />
               <p v-if="errors.email" class="mt-1 text-sm text-destructive">{{ errors.email }}</p>
             </div>
 
             <!-- Password field -->
             <div>
-              <Label for="password" class="text-right">Contraseña</Label>
+              <Label class="text-right" for="password">Contraseña</Label>
               <Input
                 id="password"
                 v-model="password"
-                type="password"
-                required
                 :class="{ 'border-destructive': errors.password }"
-                @blur="validateField('password')"
                 placeholder="••••••••"
+                required
+                type="password"
+                @blur="validateField('password')"
               />
-              <p v-if="errors.password" class="mt-1 text-sm text-destructive">{{ errors.password }}</p>
+              <p v-if="errors.password" class="mt-1 text-sm text-destructive">
+                {{ errors.password }}
+              </p>
             </div>
 
             <!-- Confirm Password field -->
             <div>
-              <Label for="confirmPassword" class="text-right">Confirmar Contraseña</Label>
+              <Label class="text-right" for="confirmPassword">Confirmar Contraseña</Label>
               <Input
                 id="confirmPassword"
                 v-model="confirmPassword"
-                type="password"
-                required
                 :class="{ 'border-destructive': errors.confirmPassword }"
-                @blur="validateField('confirmPassword')"
                 placeholder="••••••••"
+                required
+                type="password"
+                @blur="validateField('confirmPassword')"
               />
-              <p v-if="errors.confirmPassword" class="mt-1 text-sm text-destructive">{{ errors.confirmPassword }}</p>
+              <p v-if="errors.confirmPassword" class="mt-1 text-sm text-destructive">
+                {{ errors.confirmPassword }}
+              </p>
             </div>
 
             <!-- Role selection -->
@@ -89,8 +95,12 @@
           <div v-if="errorMessage" class="mt-4 rounded-md bg-destructive/10 p-4">
             <div class="flex">
               <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-destructive" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 001.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                <svg class="h-5 w-5 text-destructive" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    clip-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 001.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    fill-rule="evenodd"
+                  />
                 </svg>
               </div>
               <div class="ml-3">
@@ -102,19 +112,28 @@
           </div>
 
           <!-- Submit button -->
-          <Button 
-            type="submit" 
-            class="mt-6 w-full" 
-            :disabled="isLoading"
-            variant="default"
-          >
-            <span v-if="!isLoading" class="flex items-center">
-              Crear Cuenta
-            </span>
+          <Button :disabled="isLoading" class="mt-6 w-full" type="submit" variant="default">
+            <span v-if="!isLoading" class="flex items-center"> Crear Cuenta </span>
             <span v-else class="flex items-center justify-center">
-              <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <svg
+                class="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  fill="currentColor"
+                ></path>
               </svg>
               Procesando...
             </span>
@@ -123,7 +142,7 @@
 
         <div class="mt-4 text-center text-sm">
           ¿Ya tienes cuenta?
-          <RouterLink to="/login" class="font-medium underline underline-offset-4 text-primary">
+          <RouterLink class="font-medium underline underline-offset-4 text-primary" to="/login">
             Inicia sesión aquí
           </RouterLink>
         </div>
@@ -132,8 +151,8 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, reactive } from 'vue'
+<script lang="ts" setup>
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
 import { Button } from '@/components/ui/button'
@@ -155,7 +174,7 @@ const errors = reactive({
   email: '',
   password: '',
   confirmPassword: '',
-  role: ''
+  role: '',
 })
 
 const router = useRouter()
@@ -217,22 +236,22 @@ const isValidEmail = (email: string) => {
 const handleRegister = async () => {
   // Reset errors
   errorMessage.value = ''
-  
+
   // Validate all fields
   validateField('fullName')
   validateField('email')
   validateField('password')
   validateField('confirmPassword')
   validateField('role')
-  
+
   // Check if there are validation errors
-  const hasErrors = Object.values(errors).some(error => error !== '')
+  const hasErrors = Object.values(errors).some((error) => error !== '')
   if (hasErrors) {
     return
   }
-  
+
   isLoading.value = true
-  
+
   try {
     // Sign up with Supabase Auth
     const { error: authError, data } = await supabase.auth.signUp({
@@ -241,15 +260,15 @@ const handleRegister = async () => {
       options: {
         data: {
           full_name: fullName.value,
-          role: role.value
-        }
-      }
+          role: role.value,
+        },
+      },
     })
-    
+
     if (authError) {
       throw authError
     }
-    
+
     // Redirect to login with success message
     // The user profile should be created automatically via the trigger in Supabase
     router.push('/login')

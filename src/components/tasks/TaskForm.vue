@@ -2,8 +2,19 @@
   <Dialog>
     <DialogTrigger as-child>
       <Button>
-        <svg xmlns="http://www.w3.org/2000/svg" class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        <svg
+          class="mr-2 h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+          />
         </svg>
         Nueva Tarea
       </Button>
@@ -25,11 +36,7 @@
                 <SelectValue placeholder="Seleccione un accommodation" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem 
-                  v-for="acc in accommodations" 
-                  :key="acc.id" 
-                  :value="acc.id"
-                >
+                <SelectItem v-for="acc in accommodations" :key="acc.id" :value="acc.id">
                   {{ acc.code }} - {{ acc.name }}
                 </SelectItem>
               </SelectContent>
@@ -44,11 +51,7 @@
                 <SelectValue placeholder="Seleccione un área" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem 
-                  v-for="area in areas" 
-                  :key="area" 
-                  :value="area"
-                >
+                <SelectItem v-for="area in areas" :key="area" :value="area">
                   {{ formatAreaName(area) }}
                 </SelectItem>
               </SelectContent>
@@ -63,11 +66,7 @@
                 <SelectValue placeholder="Seleccione un elemento" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem 
-                  v-for="element in elements" 
-                  :key="element" 
-                  :value="element"
-                >
+                <SelectItem v-for="element in elements" :key="element" :value="element">
                   {{ formatElementName(element) }}
                 </SelectItem>
               </SelectContent>
@@ -83,19 +82,13 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="low">
-                  <div class="flex items-center">
-                    <span class="mr-2">🟢</span> Baja
-                  </div>
+                  <div class="flex items-center"><span class="mr-2">🟢</span> Baja</div>
                 </SelectItem>
                 <SelectItem value="medium">
-                  <div class="flex items-center">
-                    <span class="mr-2">🟡</span> Media
-                  </div>
+                  <div class="flex items-center"><span class="mr-2">🟡</span> Media</div>
                 </SelectItem>
                 <SelectItem value="high">
-                  <div class="flex items-center">
-                    <span class="mr-2">🔴</span> Alta
-                  </div>
+                  <div class="flex items-center"><span class="mr-2">🔴</span> Alta</div>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -108,8 +101,8 @@
           <Textarea
             id="description"
             v-model="formData.description"
-            placeholder="Describa detalladamente el problema detectado..."
             :class="{ 'border-destructive': errors.description }"
+            placeholder="Describa detalladamente el problema detectado..."
             @blur="validateField('description')"
           />
           <p v-if="errors.description" class="text-sm text-destructive">{{ errors.description }}</p>
@@ -121,8 +114,8 @@
           <Input
             id="dueDate"
             v-model="formData.due_date"
-            type="date"
             :class="{ 'border-destructive': errors.due_date }"
+            type="date"
             @blur="validateField('due_date')"
           />
           <p v-if="errors.due_date" class="text-sm text-destructive">{{ errors.due_date }}</p>
@@ -150,31 +143,39 @@
           <Input
             id="estimatedCost"
             v-model="formData.estimated_cost"
-            type="number"
-            step="0.01"
             placeholder="0.00"
+            step="0.01"
+            type="number"
           />
         </div>
       </div>
       <DialogFooter>
-        <Button @click="handleCreate" :disabled="!isFormValid">Crear Tarea</Button>
+        <Button :disabled="!isFormValid" @click="handleCreate">Crear Tarea</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
 
-<script setup lang="ts">
-import { ref, reactive, onMounted, computed, onBeforeMount } from 'vue'
+<script lang="ts" setup>
+import { computed, onBeforeMount, onMounted, reactive, ref } from 'vue'
 import { useToast } from 'vue-toastification'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { taskService, type CreateTaskData } from '@/composables/taskService'
-import { accommodationService, type Accommodation } from '@/composables/accommodationService'
+import { type CreateTaskData, taskService } from '@/composables/taskService'
+import { type Accommodation, accommodationService } from '@/composables/accommodationService'
 
 // Definición de tipos para el formulario
 interface TaskFormData {
@@ -204,7 +205,7 @@ const tags = ref<Tag[]>([
   { id: '2', name: 'electricidad', color: '#EF4444' },
   { id: '3', name: 'pintura', color: '#EC4899' },
   { id: '4', name: 'urgente', color: '#DC2626' },
-  { id: '5', name: 'preventivo', color: '#0891B2' }
+  { id: '5', name: 'preventivo', color: '#0891B2' },
 ])
 
 // Estado del formulario
@@ -216,12 +217,12 @@ const formData = ref<TaskFormData>({
   priority: 'medium',
   due_date: '',
   tags: [],
-  estimated_cost: ''
+  estimated_cost: '',
 })
 
 const errors = reactive({
   description: '',
-  due_date: ''
+  due_date: '',
 })
 
 // Cargar accommodations cuando se monte el componente
@@ -237,13 +238,17 @@ onBeforeMount(async () => {
 // Computed properties para áreas y elementos
 const areas = computed(() => {
   if (!formData.value.accommodation_id) return []
-  const accommodation = accommodations.value.find(acc => acc.id === formData.value.accommodation_id)
+  const accommodation = accommodations.value.find(
+    (acc) => acc.id === formData.value.accommodation_id,
+  )
   return accommodation ? Object.keys(accommodation.configured_areas || {}) : []
 })
 
 const elements = computed(() => {
   if (!formData.value.area || !formData.value.accommodation_id) return []
-  const accommodation = accommodations.value.find(acc => acc.id === formData.value.accommodation_id)
+  const accommodation = accommodations.value.find(
+    (acc) => acc.id === formData.value.accommodation_id,
+  )
   return accommodation ? accommodation.configured_areas?.[formData.value.area] || [] : []
 })
 
@@ -277,33 +282,33 @@ const validateField = (field: string) => {
 // Formato para nombres de áreas y elementos
 const formatAreaName = (area: string) => {
   const areaNames: Record<string, string> = {
-    'living_room': 'Sala de Estar',
-    'kitchen': 'Cocina',
-    'bathroom_1': 'Baño Principal',
-    'bathroom_2': 'Segundo Baño',
-    'bedroom_1': 'Dormitorio Principal',
-    'bedroom_2': 'Segundo Dormitorio',
-    'bedroom_3': 'Tercer Dormitorio',
-    'terrace': 'Terraza',
-    'garage': 'Garaje'
+    living_room: 'Sala de Estar',
+    kitchen: 'Cocina',
+    bathroom_1: 'Baño Principal',
+    bathroom_2: 'Segundo Baño',
+    bedroom_1: 'Dormitorio Principal',
+    bedroom_2: 'Segundo Dormitorio',
+    bedroom_3: 'Tercer Dormitorio',
+    terrace: 'Terraza',
+    garage: 'Garaje',
   }
   return areaNames[area] || area
 }
 
 const formatElementName = (element: string) => {
   const elementNames: Record<string, string> = {
-    'sofa': 'Sofá',
-    'tv': 'Televisión',
-    'table': 'Mesa',
-    'refrigerator': 'Refrigerador',
-    'stove': 'Estufa',
-    'sink': 'Fregadero',
-    'microwave': 'Microondas',
-    'toilet': 'Inodoro',
-    'shower': 'Ducha',
-    'bed': 'Cama',
-    'wardrobe': 'Ropero',
-    'nightstand': 'Mesita de noche'
+    sofa: 'Sofá',
+    tv: 'Televisión',
+    table: 'Mesa',
+    refrigerator: 'Refrigerador',
+    stove: 'Estufa',
+    sink: 'Fregadero',
+    microwave: 'Microondas',
+    toilet: 'Inodoro',
+    shower: 'Ducha',
+    bed: 'Cama',
+    wardrobe: 'Ropero',
+    nightstand: 'Mesita de noche',
   }
   return elementNames[element] || element
 }
@@ -340,11 +345,11 @@ const handleCreate = async () => {
   // Validar todos los campos
   validateField('description')
   validateField('due_date')
-  
+
   if (!isFormValid.value) {
     return
   }
-  
+
   try {
     // Preparar los datos para la creación
     const taskData: CreateTaskData = {
@@ -355,15 +360,17 @@ const handleCreate = async () => {
       priority: formData.value.priority,
       due_date: formData.value.due_date,
       notes: formData.value.description, // Usamos la descripción como notas también
-      estimated_cost: formData.value.estimated_cost ? parseFloat(formData.value.estimated_cost) : undefined
+      estimated_cost: formData.value.estimated_cost
+        ? parseFloat(formData.value.estimated_cost)
+        : undefined,
     }
-    
+
     // Llamar al servicio para crear la tarea
     await taskService.create(taskData)
-    
+
     // Mostrar mensaje de éxito
     toast.success('Tarea creada exitosamente')
-    
+
     // Resetear formulario después de crear
     formData.value = {
       accommodation_id: '',
@@ -373,9 +380,9 @@ const handleCreate = async () => {
       priority: 'medium',
       due_date: '',
       tags: [],
-      estimated_cost: ''
+      estimated_cost: '',
     }
-    
+
     // Cerrar el diálogo (si es que se puede acceder al control del diálogo)
     // Aquí normalmente cerraríamos el diálogo
   } catch (error) {
