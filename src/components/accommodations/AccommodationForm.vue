@@ -86,7 +86,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { useToast } from 'vue-toastification'
+import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -99,9 +99,6 @@ import { accommodationService, type CreateAccommodationData } from '@/composable
 const emit = defineEmits<{
   (e: 'accommodation-created'): void
 }>()
-
-// Toast para notificaciones
-const toast = useToast()
 
 // Definición de tipos para el formulario
 interface AccommodationFormData {

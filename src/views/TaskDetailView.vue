@@ -368,7 +368,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useToast } from 'vue-toastification'
+import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -404,7 +404,6 @@ import { costService, type CreateCostData } from '@/composables/costService'
 // Variables
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
 
 const taskId = ref(route.params.id as string)
 const task = ref<Task | null>(null)

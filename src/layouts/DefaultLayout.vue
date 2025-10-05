@@ -1,5 +1,8 @@
 <template>
-  <div v-if="isAuthenticated" class="flex h-screen">
+  <div v-if="authStore.isLoading" class="h-screen flex items-center justify-center">
+    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+  </div>
+  <div v-else-if="authStore.isAuthenticated" class="flex h-screen">
     <!-- Sidebar -->
     <div class="w-64 bg-background border-r flex flex-col">
       <div class="p-4 border-b">
@@ -28,7 +31,7 @@
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              Accommodations
+              Alojamientos
             </RouterLink>
           </li>
           <li>
@@ -60,13 +63,19 @@
       <div class="p-4 border-t">
         <div class="flex items-center">
           <div class="bg-muted rounded-full w-10 h-10 flex items-center justify-center">
-            <span class="font-medium text-foreground">U</span>
+            <span class="font-medium text-foreground">
+              {{ authStore.fullName ? authStore.fullName.charAt(0).toUpperCase() : 'U' }}
+            </span>
           </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-foreground">{{ authStore.fullName }}</p>
-            <p class="text-xs text-muted-foreground capitalize">{{ authStore.role }}</p>
+          <div class="ml-3 flex-1 min-w-0">
+            <p class="text-sm font-medium text-foreground truncate">
+              {{ authStore.fullName || 'Usuario' }}
+            </p>
+            <p class="text-xs text-muted-foreground capitalize truncate">
+              {{ formatRole(authStore.role) }}
+            </p>
           </div>
-          <Button variant="ghost" size="sm" class="ml-auto" @click="handleLogout">
+          <Button variant="ghost" size="sm" class="ml-2" @click="handleLogout">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
@@ -104,6 +113,14 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
-// Computed property para saber si está autenticado
-const isAuthenticated = authStore.isAuthenticated
+const formatRole = (role: string | null) => {
+  if (!role) return 'Usuario'
+  
+  const roleNames: Record<string, string> = {
+    'supervisor': 'Supervisor',
+    'chief': 'Jefe'
+  }
+  
+  return roleNames[role] || role
+}
 </script>
