@@ -138,7 +138,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useToast } from 'vue-toastification'
+import { toast } from '@/components/ui/sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -150,7 +150,6 @@ import { costService, type Cost } from '@/composables/costService'
 // Variables
 const route = useRoute()
 const router = useRouter()
-const toast = useToast()
 
 const accommodationId = ref(route.params.id as string)
 const accommodation = ref<Accommodation | null>(null)

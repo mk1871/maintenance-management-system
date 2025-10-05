@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import { createRouter, createWebHistory } from 'vue-router'
-import { RouterLink, RouterView } from 'vue-router'
 
 // Mock de Supabase - definir antes del vi.mock para evitar el error de inicialización
 const mockSignIn = vi.fn()
@@ -28,12 +27,17 @@ const router = createRouter({
   ]
 })
 
+// Tipo para el componente LoginForm
+interface LoginFormComponent {
+  default: any
+}
+
 describe('US-001: Login', () => {
   let LoginForm: any
 
   beforeEach(async () => {
     // Importar el componente después de hacer el mock
-    const module = await import('./LoginForm.vue')
+    const module: LoginFormComponent = await import('./LoginForm.vue')
     LoginForm = module.default
     
     vi.clearAllMocks()
@@ -70,7 +74,8 @@ describe('US-001: Login', () => {
     
     // Verificar que se cambió el estado de loading
     await vi.waitFor(() => {
-      expect(wrapper.vm.isLoading).toBe(false)
+      const vm = wrapper.vm as any
+      expect(vm.isLoading).toBe(false)
     })
   })
 

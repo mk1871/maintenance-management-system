@@ -84,10 +84,10 @@ export const useAuthStore = defineStore('auth', () => {
         setError('Usuario no encontrado en la base de datos')
         clearAuth()
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Auth check error:', err)
       clearAuth()
-      setError(err?.message || 'Error desconocido')
+      setError((err as Error)?.message || 'Error desconocido')
     } finally {
       isLoading.value = false
     }

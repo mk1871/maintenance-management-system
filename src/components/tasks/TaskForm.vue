@@ -158,7 +158,7 @@
 
 <script lang="ts" setup>
 import { computed, onBeforeMount, onMounted, reactive, ref } from 'vue'
-import { useToast } from 'vue-toastification'
+import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -194,9 +194,6 @@ interface Tag {
   name: string
   color: string
 }
-
-// Importar toast
-const toast = useToast()
 
 // Datos que vienen del servicio
 const accommodations = ref<Accommodation[]>([])
