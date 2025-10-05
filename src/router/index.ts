@@ -17,6 +17,12 @@ const router = createRouter({
       meta: { requiresAuth: false, hideForAuth: true }
     },
     {
+      path: '/register',
+      name: 'Register',
+      component: () => import('../views/RegisterView.vue'),
+      meta: { requiresAuth: false, hideForAuth: true }
+    },
+    {
       path: '/accommodations',
       name: 'Accommodations',
       component: () => import('../views/AccommodationsView.vue'),
