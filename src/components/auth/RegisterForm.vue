@@ -237,33 +237,21 @@ const handleRegister = async () => {
     // Sign up with Supabase Auth
     const { error: authError, data } = await supabase.auth.signUp({
       email: email.value,
-      password: password.value
+      password: password.value,
+      options: {
+        data: {
+          full_name: fullName.value,
+          role: role.value
+        }
+      }
     })
     
     if (authError) {
       throw authError
     }
     
-    // If user was created in Supabase Auth, add extended user info to our custom table
-    if (data.user) {
-      const { error: dbError } = await supabase
-        .from('users')
-        .insert([{
-          id: data.user.id,
-          role: role.value,
-          full_name: fullName.value,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }])
-      
-      if (dbError) {
-        // If inserting to our table fails, try to delete the auth user
-        await supabase.auth.admin.deleteUser(data.user.id)
-        throw dbError
-      }
-    }
-    
-    // Redirect to login
+    // Redirect to login with success message
+    // The user profile should be created automatically via the trigger in Supabase
     router.push('/login')
   } catch (error: any) {
     console.error('Registration error:', error)
