@@ -20,12 +20,15 @@ export const useAuthStore = defineStore('auth', () => {
   // Actions
   const setUser = (user: User | null) => {
     supabaseUser.value = user
-    error.value = null
+    // No limpiar el error aquí, puede ser útil para mostrar mensajes
   }
 
   const setUserProfile = (profile: UserProfile | null) => {
     userProfile.value = profile
-    error.value = null
+    // Limpiar error cuando se establece el perfil correctamente
+    if (profile) {
+      error.value = null
+    }
   }
 
   const setError = (errorMessage: string | null) => {
@@ -38,7 +41,16 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
   }
 
+  const clearError = () => {
+    error.value = null
+  }
+
   const checkAuth = async () => {
+    // Evitar llamadas múltiples simultáneas
+    if (isLoading.value) {
+      return
+    }
+    
     isLoading.value = true
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -117,6 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
     setUserProfile,
     setError,
     clearAuth,
+    clearError,
     checkAuth,
     initAuth
   }

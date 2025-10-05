@@ -176,10 +176,14 @@ const handleLogin = async () => {
     if (authStore.isAuthenticated) {
       // Redirect to dashboard
       router.push('/')
+    } else if (authStore.error) {
+      // If there's an error in the auth store (user not in our table), show it
+      errorMessage.value = authStore.error
+      await authStore.clearAuth()
     } else {
-      // If the user exists in Supabase but not in our users table, show error
-      errorMessage.value = 'Usuario no encontrado en la base de datos. Contacte al administrador.'
-      authStore.clearAuth()
+      // Unexpected state - user logged in but no error and not authenticated
+      errorMessage.value = 'Error inesperado. Por favor, contacte al administrador.'
+      await authStore.clearAuth()
     }
   } catch (error: any) {
     console.error('Login error:', error)
