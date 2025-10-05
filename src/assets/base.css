@@ -1,0 +1,10 @@
+/* src/assets/base.css */
+body {
+  /* Enable consistent font smoothing across browsers */
+  -webkit-font-smoothing: antialiased; /* For Chrome and Safari */
+  -moz-osx-font-smoothing: grayscale; /* For Firefox on macOS */
+  text-rendering: optimizeLegibility; /* Improves legibility for some fonts */
+
+  /* Smooth transition for theme switches (optional) */
+  transition: color 0.5s, background-color 0.5s;
+}
