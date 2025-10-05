@@ -1,0 +1,27 @@
+# Archivos de contexto (NO subir al repo público)
+QWEN.md
+PROJECT_CONTEXT.md
+requirements/
+database/
+workflow/
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Dependencias y builds
+node_modules/
+dist/
+.output/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+
