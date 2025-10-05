@@ -70,7 +70,7 @@ const formatStatus = (status: string) => {
 }
 
 const getStatusVariant = (status: string) => {
-  const variants: Record<string, any> = {
+  const variants: Record<string, string> = {
     'active': 'default',
     'inactive': 'secondary'
   }

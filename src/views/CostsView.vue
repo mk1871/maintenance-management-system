@@ -139,7 +139,7 @@
             <TableBody>
               <TableRow v-for="cost in filteredCosts" :key="cost.id">
                 <TableCell>{{ formatDate(cost.expense_date) }}</TableCell>
-                <TableCell>{{ cost.accommodation?.code || 'N/A' }}</TableCell>
+                <TableCell>{{ getAccommodationCode(cost.accommodation_id) }}</TableCell>
                 <TableCell>
                   <RouterLink 
                     :to="`/tasks/${cost.task_id}`" 
@@ -311,6 +311,11 @@ const averagePerTask = computed(() => {
 // Funciones auxiliares
 const formatDate = (date: Date | string) => {
   return new Intl.DateTimeFormat('es-ES').format(new Date(date))
+}
+
+const getAccommodationCode = (accommodationId: string) => {
+  const accommodation = accommodations.value.find(acc => acc.id === accommodationId)
+  return accommodation ? accommodation.code : 'N/A'
 }
 
 const formatCostCategory = (category: string) => {

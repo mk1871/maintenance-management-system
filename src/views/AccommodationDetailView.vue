@@ -145,7 +145,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 import { taskService, type Task } from '@/composables/taskService'
-import { costService, type Cost } from '@/composables/costService'
+import { costService } from '@/composables/costService'
 
 // Variables
 const route = useRoute()
@@ -176,7 +176,7 @@ const formatStatus = (status: string) => {
 }
 
 const getStatusVariant = (status: string) => {
-  const variants: Record<string, any> = {
+  const variants: Record<string, string> = {
     'active': 'default',
     'inactive': 'secondary',
     'pending': 'secondary',
