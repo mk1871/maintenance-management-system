@@ -80,13 +80,9 @@ describe('US-001: Login', () => {
 
     // Verificar que se cambió el estado de loading
     await vi.waitFor(() => {
-      // Definir una interfaz para acceder a las propiedades del componente de forma segura
-      interface LoginFormComponent {
-        isLoading: boolean
-      }
-      
-      const vm = wrapper.vm as LoginFormComponent
-      expect(vm.isLoading).toBe(false)
+      // Verificar que el botón ya no está en estado de loading (mejor práctica de testing)
+      const button = wrapper.find('button[type="submit"]')
+      expect(button.attributes('disabled')).toBeUndefined()
     })
   })
 
