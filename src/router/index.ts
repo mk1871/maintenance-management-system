@@ -67,24 +67,40 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
-  // Initialize auth if it hasn't been done yet
+  // If route doesn't require auth, proceed
+  if (!to.meta.requiresAuth) {
+    // If route should be hidden when authenticated (like login) and user is authenticated, redirect to home
+    if (to.meta.hideForAuth && authStore.isAuthenticated) {
+      next({ name: 'Home' })
+    } else {
+      next()
+    }
+    return
+  }
+  
+  // For routes that require auth, wait for auth state to be initialized
   if (authStore.supabaseUser === null && !authStore.isLoading) {
+    // Initialize auth state
     await authStore.checkAuth()
   }
   
-  // Check if route requires auth
-  if (to.meta.requiresAuth) {
-    if (authStore.isAuthenticated) {
-      next()
-    } else {
-      // Redirect to login if not authenticated
-      next({ name: 'Login', query: { redirect: to.fullPath } })
+  // Wait for loading to complete if still loading
+  if (authStore.isLoading) {
+    // Wait for auth check to complete
+    const maxWait = 3000 // 3 seconds max wait
+    const startTime = Date.now()
+    
+    while (authStore.isLoading && (Date.now() - startTime) < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, 100))
     }
-  } else if (to.meta.hideForAuth && authStore.isAuthenticated) {
-    // If route should be hidden when authenticated (like login), redirect to home
-    next({ name: 'Home' })
-  } else {
+  }
+  
+  // Check if user is authenticated
+  if (authStore.isAuthenticated) {
     next()
+  } else {
+    // Redirect to login if not authenticated
+    next({ name: 'Login', query: { redirect: to.fullPath } })
   }
 })
 

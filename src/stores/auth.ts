@@ -68,8 +68,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (profile) {
         setUserProfile(profile)
       } else {
-        // If no profile exists in our custom table, create one
+        // If no profile exists in our custom table
         setError('Usuario no encontrado en la base de datos')
+        clearAuth()
       }
     } catch (err: any) {
       console.error('Auth check error:', err)

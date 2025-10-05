@@ -1,7 +1,10 @@
 <template>
   <div id="app" class="h-screen bg-background text-foreground">
     <Toaster class="pointer-events-auto" />
-    <DefaultLayout v-if="authStore.isAuthenticated" />
+    <div v-if="authStore.isLoading" class="h-screen flex items-center justify-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+    <DefaultLayout v-else-if="authStore.isAuthenticated" />
     <div v-else class="h-screen flex items-center justify-center">
       <RouterView />
     </div>

@@ -183,7 +183,12 @@ const handleLogin = async () => {
     }
   } catch (error: any) {
     console.error('Login error:', error)
-    errorMessage.value = 'Email o password incorrect'
+    // Mostrar mensaje más específico según el tipo de error
+    if (error?.message?.includes('Invalid login credentials')) {
+      errorMessage.value = 'Email o contraseña incorrectos'
+    } else {
+      errorMessage.value = error?.message || 'Error al iniciar sesión'
+    }
   } finally {
     isLoading.value = false
   }
