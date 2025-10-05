@@ -71,18 +71,46 @@ export const useAuthStore = defineStore('auth', () => {
         .eq('id', user.id)
         .single()
 
-      if (profileError) {
+      if (profileError && profileError.code !== 'PGRST116') {
+        // Error real (no es "no rows found")
         console.error('Profile fetch error:', profileError)
         setError('Error al cargar el perfil de usuario')
         return
       }
 
       if (profile) {
+        // Profile found, set it
         setUserProfile(profile)
       } else {
-        // If no profile exists in our custom table
-        setError('Usuario no encontrado en la base de datos')
-        clearAuth()
+        // No profile found - create one automatically for new users
+        console.log('Creating new user profile for user:', user.id)
+        const defaultProfile: UserProfile = {
+          id: user.id,
+          full_name: user.email || 'Usuario',
+          role: 'supervisor', // Default role
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        const { data: newProfile, error: createError } = await supabase
+          .from('users')
+          .insert([defaultProfile])
+          .select()
+          .single()
+        
+        if (createError) {
+          console.error('Error creating user profile:', createError)
+          setError('Error al crear el perfil de usuario')
+          clearAuth()
+          return
+        }
+        
+        if (newProfile) {
+          setUserProfile(newProfile)
+        } else {
+          setError('No se pudo crear el perfil de usuario')
+          clearAuth()
+        }
       }
     } catch (err) {
       console.error('Auth check error:', err)

@@ -182,8 +182,16 @@ const handleLogin = async () => {
       await authStore.clearAuth()
     } else {
       // Unexpected state - user logged in but no error and not authenticated
-      errorMessage.value = 'Error inesperado. Por favor, contacte al administrador.'
-      await authStore.clearAuth()
+      // This could happen during the profile creation process
+      errorMessage.value = 'Iniciando sesión...'
+      // Give it a bit more time and check again
+      await new Promise(resolve => setTimeout(resolve, 500))
+      if (authStore.isAuthenticated) {
+        router.push('/')
+      } else {
+        errorMessage.value = 'Error inesperado. Por favor, inténtelo de nuevo.'
+        await authStore.clearAuth()
+      }
     }
   } catch (error: any) {
     console.error('Login error:', error)
