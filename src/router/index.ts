@@ -49,6 +49,12 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/costs',
+      name: 'Costs',
+      component: () => import('../views/CostsView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
       component: () => import('../views/NotFoundView.vue'),
