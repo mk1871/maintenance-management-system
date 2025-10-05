@@ -8,7 +8,7 @@ export interface Accommodation {
   address?: string
   notes?: string
   status: 'active' | 'inactive'
-  configured_areas: Record<string, any>
+  configured_areas: Record<string, unknown>
   created_by: string
   created_at: string
   updated_at: string
@@ -20,7 +20,7 @@ export interface CreateAccommodationData {
   address?: string
   notes?: string
   status?: 'active' | 'inactive'
-  configured_areas: Record<string, any>
+  configured_areas: Record<string, unknown>
 }
 
 export interface UpdateAccommodationData {
@@ -29,7 +29,7 @@ export interface UpdateAccommodationData {
   address?: string
   notes?: string
   status?: 'active' | 'inactive'
-  configured_areas?: Record<string, any>
+  configured_areas?: Record<string, unknown>
 }
 
 export const accommodationService = {
@@ -38,23 +38,19 @@ export const accommodationService = {
       .from('accommodations')
       .select('*')
       .order('created_at', { ascending: false })
-    
+
     if (error) throw new Error(error.message)
     return data as Accommodation[]
   },
 
   async getById(id: string): Promise<Accommodation | null> {
-    const { data, error } = await supabase
-      .from('accommodations')
-      .select('*')
-      .eq('id', id)
-      .single()
-    
+    const { data, error } = await supabase.from('accommodations').select('*').eq('id', id).single()
+
     if (error) {
       if (error.code === 'PGRST116') return null // No rows found
       throw new Error(error.message)
     }
-    
+
     return data as Accommodation
   },
 
@@ -64,12 +60,12 @@ export const accommodationService = {
       .select('*')
       .eq('code', code)
       .single()
-    
+
     if (error) {
       if (error.code === 'PGRST116') return null // No rows found
       throw new Error(error.message)
     }
-    
+
     return data as Accommodation
   },
 
@@ -79,7 +75,7 @@ export const accommodationService = {
       .insert([accommodationData])
       .select()
       .single()
-    
+
     if (error) throw new Error(error.message)
     return data as Accommodation
   },
@@ -89,22 +85,19 @@ export const accommodationService = {
       .from('accommodations')
       .update({
         ...accommodationData,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', accommodationData.id)
       .select()
       .single()
-    
+
     if (error) throw new Error(error.message)
     return data as Accommodation
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('accommodations')
-      .delete()
-      .eq('id', id)
-    
+    const { error } = await supabase.from('accommodations').delete().eq('id', id)
+
     if (error) throw new Error(error.message)
-  }
+  },
 }

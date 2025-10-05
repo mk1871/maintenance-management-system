@@ -98,7 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
     await checkAuth()
     
     // Listen for auth changes
-    const { data: { subscription } } = await supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = await supabase.auth.onAuthStateChange(async (event, _session) => {
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         await checkAuth()
       } else if (event === 'SIGNED_OUT') {

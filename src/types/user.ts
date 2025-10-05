@@ -5,7 +5,7 @@ export interface UserProfile {
   full_name: string
   profile_picture_url?: string
   phone?: string
-  preferences?: Record<string, any>
+  preferences?: Record<string, unknown>
   created_at: string
   updated_at: string
 }
