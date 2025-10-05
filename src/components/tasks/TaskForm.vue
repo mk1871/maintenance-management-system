@@ -164,7 +164,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, onBeforeMount } from 'vue'
+import { useToast } from 'vue-toastification'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -172,6 +173,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { taskService, type CreateTaskData } from '@/composables/taskService'
+import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 
 // Definición de tipos para el formulario
 interface TaskFormData {
@@ -185,45 +188,17 @@ interface TaskFormData {
   estimated_cost: string
 }
 
-interface Accommodation {
-  id: string
-  code: string
-  name: string
-  configured_areas: Record<string, any>
-}
-
 interface Tag {
   id: string
   name: string
   color: string
 }
 
-// Datos de ejemplo - en una implementación real, estos vendrían de la API
-const accommodations = ref<Accommodation[]>([
-  {
-    id: '1',
-    code: 'ABC1',
-    name: 'Apartamento Central',
-    configured_areas: {
-      'living_room': ['sofa', 'tv', 'table'],
-      'kitchen': ['refrigerator', 'stove', 'sink', 'microwave'],
-      'bathroom_1': ['toilet', 'sink', 'shower'],
-      'bedroom_1': ['bed', 'wardrobe', 'nightstand']
-    }
-  },
-  {
-    id: '2', 
-    code: 'XYZ2',
-    name: 'Loft Moderno',
-    configured_areas: {
-      'living_room': ['sofa', 'tv', 'table'],
-      'kitchen': ['refrigerator', 'stove', 'sink'],
-      'bathroom_1': ['toilet', 'sink', 'shower'],
-      'bedroom_1': ['bed', 'wardrobe']
-    }
-  }
-])
+// Importar toast
+const toast = useToast()
 
+// Datos que vienen del servicio
+const accommodations = ref<Accommodation[]>([])
 const tags = ref<Tag[]>([
   { id: '1', name: 'fontanería', color: '#3B82F6' },
   { id: '2', name: 'electricidad', color: '#EF4444' },
@@ -249,17 +224,27 @@ const errors = reactive({
   due_date: ''
 })
 
+// Cargar accommodations cuando se monte el componente
+onBeforeMount(async () => {
+  try {
+    accommodations.value = await accommodationService.getAll()
+  } catch (error) {
+    console.error('Error al cargar accommodations:', error)
+    toast.error('Error al cargar accommodations')
+  }
+})
+
 // Computed properties para áreas y elementos
 const areas = computed(() => {
   if (!formData.value.accommodation_id) return []
   const accommodation = accommodations.value.find(acc => acc.id === formData.value.accommodation_id)
-  return accommodation ? Object.keys(accommodation.configured_areas) : []
+  return accommodation ? Object.keys(accommodation.configured_areas || {}) : []
 })
 
 const elements = computed(() => {
   if (!formData.value.area || !formData.value.accommodation_id) return []
   const accommodation = accommodations.value.find(acc => acc.id === formData.value.accommodation_id)
-  return accommodation ? accommodation.configured_areas[formData.value.area] || [] : []
+  return accommodation ? accommodation.configured_areas?.[formData.value.area] || [] : []
 })
 
 // Etiquetas disponibles
@@ -360,20 +345,43 @@ const handleCreate = async () => {
     return
   }
   
-  // Aquí iría la lógica para crear la tarea
-  console.log('Creando tarea:', formData.value)
-  // Resetear formulario después de crear
-  formData.value = {
-    accommodation_id: '',
-    area: '',
-    element: '',
-    description: '',
-    priority: 'medium',
-    due_date: '',
-    tags: [],
-    estimated_cost: ''
+  try {
+    // Preparar los datos para la creación
+    const taskData: CreateTaskData = {
+      accommodation_id: formData.value.accommodation_id,
+      area: formData.value.area,
+      element: formData.value.element,
+      description: formData.value.description,
+      priority: formData.value.priority,
+      due_date: formData.value.due_date,
+      notes: formData.value.description, // Usamos la descripción como notas también
+      estimated_cost: formData.value.estimated_cost ? parseFloat(formData.value.estimated_cost) : undefined
+    }
+    
+    // Llamar al servicio para crear la tarea
+    await taskService.create(taskData)
+    
+    // Mostrar mensaje de éxito
+    toast.success('Tarea creada exitosamente')
+    
+    // Resetear formulario después de crear
+    formData.value = {
+      accommodation_id: '',
+      area: '',
+      element: '',
+      description: '',
+      priority: 'medium',
+      due_date: '',
+      tags: [],
+      estimated_cost: ''
+    }
+    
+    // Cerrar el diálogo (si es que se puede acceder al control del diálogo)
+    // Aquí normalmente cerraríamos el diálogo
+  } catch (error) {
+    console.error('Error al crear tarea:', error)
+    toast.error('Error al crear la tarea')
   }
-  // Aquí es donde se llamaría a la API para crear la tarea
 }
 
 onMounted(() => {
