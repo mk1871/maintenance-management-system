@@ -1,58 +1,52 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script lang="ts" setup>
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import AccommodationForm from '@/components/accommodations/AccommodationForm.vue'
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
+import { useDataLoader } from '@/composables/useDataLoader'
+import { Spinner } from '@/components/ui/spinner'
 
-// Datos de accommodations
-const accommodations = ref<Accommodation[]>([])
+const { data: accommodations, isLoading, load } = useDataLoader<Accommodation>()
 
-// Funciones para formatear datos
-const formatStatus = (status: string) => {
-  const statusNames: Record<string, string> = {
-    'active': 'Activo',
-    'inactive': 'Inactivo'
+const formatStatus = (status: string) =>
+  ({
+    active: 'Activo',
+    inactive: 'Inactivo',
+  })[status] ?? status
+
+const getStatusVariant = (status: string): 'default' | 'secondary' => {
+  const variants: Record<string, 'default' | 'secondary'> = {
+    active: 'default',
+    inactive: 'secondary',
   }
-  return statusNames[status] || status
+  return variants[status] ?? 'default'
 }
 
-const getStatusVariant = (status: string) => {
-  const variants: Record<string, string> = {
-    'active': 'default',
-    'inactive': 'secondary'
-  }
-  return variants[status] || 'default'
-}
-
-// Cargar accommodations
-const loadAccommodations = async () => {
-  try {
-    accommodations.value = await accommodationService.getAll()
-  } catch (error) {
-    console.error('Error al cargar accommodations:', error)
-    // Aquí podrías mostrar un toast o mensaje de error
-  }
-}
-
-// Cargar accommodations cuando se monte el componente
-onMounted(async () => {
-  await loadAccommodations()
-})
+load(accommodationService.getAll)
 </script>
 
 <template>
   <div class="container mx-auto py-6">
     <div class="flex justify-between items-center mb-6">
       <h1 class="text-3xl font-bold text-foreground">Accommodations</h1>
-      <AccommodationForm @accommodation-created="loadAccommodations" />
+      <AccommodationForm @accommodation-created="() => load(accommodationService.getAll)" />
     </div>
-    
+
     <Card>
       <CardContent class="p-0">
-        <div class="overflow-x-auto">
+        <div v-if="isLoading" class="h-64 flex items-center justify-center">
+          <Spinner class="h-12 w-12" />
+        </div>
+        <div v-else class="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -65,7 +59,7 @@ onMounted(async () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="accommodation in accommodations" :key="accommodation.id">
+              <TableRow v-for="accommodation in accommodations || []" :key="accommodation.id">
                 <TableCell>{{ accommodation.code }}</TableCell>
                 <TableCell>{{ accommodation.name }}</TableCell>
                 <TableCell>{{ accommodation.address || 'N/A' }}</TableCell>
@@ -76,9 +70,9 @@ onMounted(async () => {
                 </TableCell>
                 <TableCell>0</TableCell>
                 <TableCell>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     @click="$router.push(`/accommodations/${accommodation.id}`)"
                   >
                     Ver

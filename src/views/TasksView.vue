@@ -1,168 +1,198 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script lang="ts" setup>
+import { computed, onMounted, reactive, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table'
-import TaskForm from '@/components/tasks/TaskForm.vue'
-import { taskService, type Task } from '@/composables/taskService'
+import { Spinner } from '@/components/ui/spinner'
+import { type CreateTaskData, taskService, type Task } from '@/composables/taskService'
+import { type Accommodation, accommodationService } from '@/composables/accommodationService'
 
-// Datos de tareas
-const tasks = ref<Task[]>([])
-
-// Router para navegación
 const router = useRouter()
-
-// Funciones para formatear datos
-const formatPriority = (priority: string) => {
-  const priorityNames: Record<string, string> = {
-    'low': 'Baja',
-    'medium': 'Media',
-    'high': 'Alta'
-  }
-  return priorityNames[priority] || priority
-}
-
-const getPriorityEmoji = (priority: string) => {
-  const priorityEmojis: Record<string, string> = {
-    'low': '🟢',
-    'medium': '🟡',
-    'high': '🔴'
-  }
-  return priorityEmojis[priority] || ''
-}
-
-const getPriorityVariant = (priority: string) => {
-  const variants: Record<string, any> = {
-    'low': 'secondary',
-    'medium': 'default',
-    'high': 'destructive'
-  }
-  return variants[priority] || 'default'
-}
-
-const formatStatus = (status: string) => {
-  const statusNames: Record<string, string> = {
-    'pending': 'Pendiente',
-    'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'cancelled': 'Cancelada'
-  }
-  return statusNames[status] || status
-}
-
-const getStatusVariant = (status: string) => {
-  const variants: Record<string, any> = {
-    'pending': 'secondary',
-    'in_progress': 'default',
-    'completed': 'success',
-    'cancelled': 'destructive'
-  }
-  return variants[status] || 'default'
-}
-
-const formatAreaName = (area: string) => {
-  const areaNames: Record<string, string> = {
-    'living_room': 'Sala de Estar',
-    'kitchen': 'Cocina',
-    'bathroom_1': 'Baño Principal',
-    'bathroom_2': 'Segundo Baño',
-    'bedroom_1': 'Dormitorio Principal',
-    'bedroom_2': 'Segundo Dormitorio',
-    'bedroom_3': 'Tercer Dormitorio',
-    'terrace': 'Terraza',
-    'garage': 'Garaje'
-  }
-  return areaNames[area] || area
-}
-
-const formatElementName = (element: string) => {
-  const elementNames: Record<string, string> = {
-    'pipe': 'Cañería',
-    'toilet': 'Inodoro',
-    'sink': 'Fregadero',
-    'shower': 'Ducha',
-    'refrigerator': 'Refrigerador',
-    'stove': 'Estufa'
-  }
-  return elementNames[element] || element
-}
-
-const formatDate = (date: string) => {
-  return new Intl.DateTimeFormat('es-ES').format(new Date(date))
-}
-
-// Cargar tareas cuando se monte el componente
-onMounted(async () => {
-  try {
-    tasks.value = await taskService.getAll()
-  } catch (error) {
-    console.error('Error al cargar tareas:', error)
-    // Aquí podrías mostrar un toast o mensaje de error
-  }
+const accommodations = ref<Accommodation[]>([])
+const formData = ref({
+  accommodation_id: '',
+  area: '',
+  element: '',
+  description: '',
+  priority: 'medium' as 'low' | 'medium' | 'high',
+  due_date: '',
+  estimated_cost: ''
 })
+const errors = reactive({ description: '', due_date: '' })
+const isSubmitting = ref(false)
+
+const loadAccommodations = async () => {
+  try {
+    accommodations.value = await accommodationService.getAll()
+  } catch {
+    toast.error('Error loading accommodations')
+  }
+}
+
+onMounted(async () => {
+  await loadAccommodations()
+  const d = new Date(); d.setDate(d.getDate() + 1)
+  formData.value.due_date = d.toISOString().split('T')[0]
+})
+
+const areas = computed(() => {
+  if (!formData.value.accommodation_id) return []
+  const acc = accommodations.value.find(a => a.id === formData.value.accommodation_id)
+  return acc?.configured_areas ? Object.keys(acc.configured_areas) : []
+})
+
+const elements = computed(() => {
+  if (!formData.value.area) return []
+  const acc = accommodations.value.find(a => a.id === formData.value.accommodation_id)
+  return acc?.configured_areas?.[formData.value.area] || []
+})
+
+const isFormValid = computed(() =>
+  !!formData.value.accommodation_id &&
+  !!formData.value.area &&
+  !!formData.value.element &&
+  formData.value.description.length >= 10 &&
+  !!formData.value.due_date &&
+  !errors.description &&
+  !errors.due_date
+)
+
+function validateField(field: string) {
+  if (field === 'description') {
+    const v = formData.value.description
+    errors.description = !v ? 'Required' : v.length < 10 ? 'Min 10 chars' : ''
+  }
+  if (field === 'due_date') {
+    const d = new Date(formData.value.due_date)
+    errors.due_date = !formData.value.due_date ? 'Required' : d < new Date() ? 'Must be future' : ''
+  }
+}
+
+async function handleCreate() {
+  validateField('description')
+  validateField('due_date')
+  if (!isFormValid.value) return
+
+  const data: CreateTaskData = {
+    accommodation_id: formData.value.accommodation_id,
+    area: formData.value.area,
+    element: formData.value.element,
+    description: formData.value.description,
+    priority: formData.value.priority,
+    due_date: formData.value.due_date,
+    estimated_cost: formData.value.estimated_cost ? parseFloat(formData.value.estimated_cost) : undefined
+  }
+
+  isSubmitting.value = true
+  try {
+    await taskService.create(data)
+    toast.success('Task created successfully')
+    // reset form
+    formData.value = {
+      accommodation_id: '',
+      area: '',
+      element: '',
+      description: '',
+      priority: 'medium',
+      due_date: formData.value.due_date,
+      estimated_cost: ''
+    }
+    errors.description = ''
+    errors.due_date = ''
+    router.push({ name: 'Home' })
+  } catch {
+    toast.error('Error creating task')
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="container mx-auto py-6">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold text-foreground">Tareas de Mantenimiento</h1>
-      <TaskForm />
-    </div>
-    
-    <Card>
-      <CardContent class="p-0">
-        <div class="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Accommodation</TableHead>
-                <TableHead>Área/Elemento</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="task in tasks" :key="task.id" class="hover:bg-muted/50">
-                <TableCell>{{ task.accommodation?.code }} - {{ task.accommodation?.name }}</TableCell>
-                <TableCell>{{ formatAreaName(task.area) }} / {{ formatElementName(task.element) }}</TableCell>
-                <TableCell>{{ task.description }}</TableCell>
-                <TableCell>
-                  <Badge :variant="getPriorityVariant(task.priority)">
-                    {{ getPriorityEmoji(task.priority) }} {{ formatPriority(task.priority) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getStatusVariant(task.status)">
-                    {{ formatStatus(task.status) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>{{ formatDate(task.due_date) }}</TableCell>
-                <TableCell>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    @click="$router.push(`/tasks/${task.id}`)"
-                  >
-                    Ver
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+  <Dialog>
+    <DialogTrigger as-child>
+      <Button>New Task</Button>
+    </DialogTrigger>
+    <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Create Maintenance Task</DialogTitle>
+        <DialogDescription>Complete form fields</DialogDescription>
+      </DialogHeader>
+      <div class="grid gap-4 py-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <Label>Accommodation</Label>
+            <Select v-model="formData.accommodation_id">
+              <SelectTrigger><SelectValue placeholder="Select"/></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="acc in accommodations" :key="acc.id" :value="acc.id">
+                  {{ acc.code }} - {{ acc.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="space-y-2">
+            <Label>Area</Label>
+            <Select v-model="formData.area" :disabled="!formData.accommodation_id">
+              <SelectTrigger><SelectValue placeholder="Select"/></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="a in areas" :key="a" :value="a">{{ a }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="space-y-2">
+            <Label>Element</Label>
+            <Select v-model="formData.element" :disabled="!formData.area">
+              <SelectTrigger><SelectValue placeholder="Select"/></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="e in elements" :key="e" :value="e">{{ e }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="space-y-2">
+            <Label>Priority</Label>
+            <Select v-model="formData.priority">
+              <SelectTrigger><SelectValue/></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </CardContent>
-    </Card>
-  </div>
+        <div class="space-y-2">
+          <Label>Description</Label>
+          <Textarea v-model="formData.description" :class="{ 'border-destructive': errors.description }" @blur="() => validateField('description')"/>
+          <p v-if="errors.description" class="text-destructive">{{ errors.description }}</p>
+        </div>
+        <div class="space-y-2">
+          <Label>Due Date</Label>
+          <Input v-model="formData.due_date" :class="{ 'border-destructive': errors.due_date }" type="date" @blur="() => validateField('due_date')"/>
+          <p v-if="errors.due_date" class="text-destructive">{{ errors.due_date }}</p>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button :disabled="!isFormValid" @click="handleCreate">
+          <span v-if="!isSubmitting">Create Task</span>
+          <Spinner v-else class="h-5 w-5"/>
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
+
