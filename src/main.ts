@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { useVueSonner } from 'vue-sonner'
+import { useAuthStore } from '@/stores/auth'
 
 import App from './App.vue'
 import router from './router'
@@ -13,3 +14,6 @@ app.use(useVueSonner)
 app.use(router)
 
 app.mount('#app')
+// Inicializar auth store después del mount
+const authStore = useAuthStore()
+authStore.initAuth()

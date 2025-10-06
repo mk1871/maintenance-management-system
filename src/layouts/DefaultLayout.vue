@@ -1,92 +1,85 @@
-<script setup lang="ts">
-import { onMounted } from 'vue'
+<script lang="ts" setup>
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { HomeIcon, Building2Icon, ListIcon, CreditCardIcon, LogOutIcon } from 'lucide-vue-next'
+import { supabase } from '@/services/supabase.ts'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
-// Verificar autenticación al cargar la aplicación
-onMounted(async () => {
-  await authStore.checkAuth()
-})
-
 const handleLogout = async () => {
+  // 1. Cerrar sesión en Supabase
+  await supabase.auth.signOut()
+
+  // 2. Limpiar el estado de la store
   await authStore.clearAuth()
-  router.push('/login')
+
+  // 3. Reemplazar la URL actual por /login (sin agregar historial)
+  router.replace({ name: 'Login' })
+
+  // 4. Reemplazar el historial para que “Atrás” no vuelva
+  window.history.replaceState({}, '', '/login')
 }
 
 const formatRole = (role: string | null) => {
   if (!role) return 'Usuario'
-  
   const roleNames: Record<string, string> = {
-    'supervisor': 'Supervisor',
-    'chief': 'Jefe'
+    supervisor: 'Supervisor',
+    chief: 'Jefe',
   }
-  
   return roleNames[role] || role
 }
 </script>
 
 <template>
   <div v-if="authStore.isLoading" class="h-screen flex items-center justify-center">
-    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    <Spinner class="h-12 w-12" />
   </div>
-  <div v-else-if="authStore.isAuthenticated" class="flex h-screen">
-    <!-- Sidebar -->
-    <div class="w-64 bg-background border-r flex flex-col">
+
+  <div v-else class="flex h-screen">
+    <!-- Sidebar (solo si autenticado) -->
+    <aside v-if="authStore.isAuthenticated" class="w-64 bg-background border-r flex flex-col">
       <div class="p-4 border-b">
-        <h1 class="text-xl font-bold text-foreground">Sistema de Gestión de Mantenimiento</h1>
+        <h1 class="text-xl font-bold text-foreground">Sistema de Gestión</h1>
       </div>
       <nav class="flex-1 p-4">
         <ul class="space-y-2">
           <li>
-            <RouterLink 
-              to="/" 
-              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+            <RouterLink
               active-class="bg-muted font-medium"
+              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+              to="/"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              Dashboard
+              <HomeIcon class="h-5 w-5 mr-3" /> Dashboard
             </RouterLink>
           </li>
           <li>
-            <RouterLink 
-              to="/accommodations" 
-              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+            <RouterLink
               active-class="bg-muted font-medium"
+              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+              to="/accommodations"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              Alojamientos
+              <Building2Icon class="h-5 w-5 mr-3" /> Alojamientos
             </RouterLink>
           </li>
           <li>
-            <RouterLink 
-              to="/tasks" 
-              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+            <RouterLink
               active-class="bg-muted font-medium"
+              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+              to="/tasks"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Tareas
+              <ListIcon class="h-5 w-5 mr-3" /> Tareas
             </RouterLink>
           </li>
           <li>
-            <RouterLink 
-              to="/costs" 
-              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+            <RouterLink
               active-class="bg-muted font-medium"
+              class="flex items-center p-2 rounded-md hover:bg-muted text-foreground"
+              to="/costs"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Costos
+              <CreditCardIcon class="h-5 w-5 mr-3" /> Costos
             </RouterLink>
           </li>
         </ul>
@@ -94,9 +87,9 @@ const formatRole = (role: string | null) => {
       <div class="p-4 border-t">
         <div class="flex items-center">
           <div class="bg-muted rounded-full w-10 h-10 flex items-center justify-center">
-            <span class="font-medium text-foreground">
-              {{ authStore.fullName ? authStore.fullName.charAt(0).toUpperCase() : 'U' }}
-            </span>
+            <span class="font-medium text-foreground">{{
+              authStore.fullName?.charAt(0).toUpperCase() || 'U'
+            }}</span>
           </div>
           <div class="ml-3 flex-1 min-w-0">
             <p class="text-sm font-medium text-foreground truncate">
@@ -106,21 +99,16 @@ const formatRole = (role: string | null) => {
               {{ formatRole(authStore.role) }}
             </p>
           </div>
-          <Button variant="ghost" size="sm" class="ml-2" @click="handleLogout">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+          <Button class="ml-2" size="sm" variant="ghost" @click="handleLogout">
+            <LogOutIcon class="h-5 w-5" />
           </Button>
         </div>
       </div>
-    </div>
+    </aside>
 
-    <!-- Main content -->
-    <div class="flex-1 overflow-auto p-6">
-      <RouterView />
-    </div>
-  </div>
-  <div v-else class="h-screen flex items-center justify-center">
-    <RouterView />
+    <!-- Contenido principal -->
+    <main :class="authStore.isAuthenticated ? 'flex-1 overflow-auto p-6' : 'flex-1'">
+      <slot />
+    </main>
   </div>
 </template>
