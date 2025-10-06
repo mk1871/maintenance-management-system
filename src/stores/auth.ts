@@ -1,6 +1,3 @@
-/**
- * Pinia Auth Store refactorizado para Supabase v2 API
- */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { User } from '@supabase/supabase-js'
@@ -43,61 +40,44 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Revisa sesión activa y carga perfil de usuario.
-   * Crea perfil si no existe, usando nueva API v2 Supabase.
+   * NUNCA crea el perfil - el trigger de BD lo hace automáticamente.
    */
   const checkAuth = async (): Promise<void> => {
     if (isLoading.value) return
     isLoading.value = true
+
     try {
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser()
+
       if (userError || !user) {
         clearAuth()
         return
       }
+
       setUser(user)
 
+      // SOLO LEER el perfil, NUNCA insertarlo
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error('Profile fetch error', profileError)
-        setError('Error al cargar el perfil de usuario')
+      if (profileError) {
+        console.error('Profile not found. Trigger should have created it:', profileError)
+        setError('Perfil de usuario no encontrado')
+        clearAuth()
         return
       }
 
       if (profile) {
         setUserProfile(profile)
       } else {
-        const defaultProfile: UserProfile = {
-          id: user.id,
-          full_name: user.email ?? '',
-          role: 'supervisor',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }
-        const { data: newProfile, error: createError } = await supabase
-          .from('users')
-          .insert(defaultProfile)
-          .select()
-          .single()
-        if (createError) {
-          console.error('Error creating user profile', createError)
-          setError('Error al crear el perfil de usuario.')
-          clearAuth()
-          return
-        }
-        if (newProfile) {
-          setUserProfile(newProfile)
-        } else {
-          setError('No se pudo crear el perfil de usuario.')
-          clearAuth()
-        }
+        setError('Perfil de usuario no encontrado')
+        clearAuth()
       }
     } catch (err: unknown) {
       console.error('Auth check error', err)
@@ -109,7 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Inicializa el listener de auth state usando nueva API v2.
+   * Inicializa el listener de auth state
    */
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()

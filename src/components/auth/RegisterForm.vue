@@ -13,7 +13,6 @@ import { toast } from 'vue-sonner'
 const router = useRouter()
 const authStore = useAuthStore()
 
-// State
 const fullName = ref('')
 const email = ref('')
 const password = ref('')
@@ -22,7 +21,6 @@ const role = ref<'supervisor' | 'chief'>('supervisor')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-// Validations
 const errors = reactive({
   fullName: '',
   email: '',
@@ -31,57 +29,45 @@ const errors = reactive({
   role: ''
 })
 
-const validateField = (field: string) => {
+function validateField(field: string) {
   switch (field) {
     case 'fullName':
-      if (!fullName.value.trim()) {
-        errors.fullName = 'Nombre completo requerido'
-      } else if (fullName.value.trim().split(' ').length < 2) {
-        errors.fullName = 'Ingrese nombre y apellido'
-      } else {
-        errors.fullName = ''
-      }
+      errors.fullName = !fullName.value.trim()
+        ? 'Nombre completo requerido'
+        : fullName.value.trim().split(' ').length < 2
+          ? 'Ingrese nombre y apellido'
+          : ''
       break
     case 'email':
-      if (!email.value) {
-        errors.email = 'Email requerido'
-      } else if (!/^\S+@\S+\.\S+$/.test(email.value)) {
-        errors.email = 'Formato de email inválido'
-      } else {
-        errors.email = ''
-      }
+      errors.email = !email.value
+        ? 'Email requerido'
+        : !/^\S+@\S+\.\S+$/.test(email.value)
+          ? 'Formato de email inválido'
+          : ''
       break
     case 'password':
-      if (!password.value) {
-        errors.password = 'Contraseña requerida'
-      } else if (password.value.length < 8) {
-        errors.password = 'Mínimo 8 caracteres'
-      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password.value)) {
-        errors.password = 'Debe incluir mayúscula, minúscula y número'
-      } else {
-        errors.password = ''
-      }
+      errors.password = !password.value
+        ? 'Contraseña requerida'
+        : password.value.length < 8
+          ? 'Mínimo 8 caracteres'
+          : !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password.value)
+            ? 'Debe incluir mayúscula, minúscula y número'
+            : ''
       break
     case 'confirmPassword':
-      if (!confirmPassword.value) {
-        errors.confirmPassword = 'Confirme la contraseña'
-      } else if (password.value !== confirmPassword.value) {
-        errors.confirmPassword = 'Las contraseñas no coinciden'
-      } else {
-        errors.confirmPassword = ''
-      }
+      errors.confirmPassword = !confirmPassword.value
+        ? 'Confirme la contraseña'
+        : password.value !== confirmPassword.value
+          ? 'Las contraseñas no coinciden'
+          : ''
       break
     case 'role':
-      if (!role.value) {
-        errors.role = 'Seleccione un rol'
-      } else {
-        errors.role = ''
-      }
+      errors.role = !role.value ? 'Seleccione un rol' : ''
       break
   }
 }
 
-const validateAllFields = () => {
+function validateAllFields(): boolean {
   validateField('fullName')
   validateField('email')
   validateField('password')
@@ -90,7 +76,7 @@ const validateAllFields = () => {
   return !Object.values(errors).some(error => error)
 }
 
-const handleRegister = async () => {
+async function handleRegister() {
   errorMessage.value = ''
 
   if (!validateAllFields()) return
@@ -98,7 +84,6 @@ const handleRegister = async () => {
   isLoading.value = true
 
   try {
-    // Registrar usuario en Supabase Auth con nueva API
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.value,
       password: password.value,
@@ -111,28 +96,12 @@ const handleRegister = async () => {
     })
 
     if (authError) throw authError
+    if (!authData.user) throw new Error('No se pudo crear el usuario')
 
-    if (!authData.user) {
-      throw new Error('No se pudo crear el usuario')
-    }
+    // Esperar que el trigger cree el perfil automáticamente
+    await new Promise(resolve => setTimeout(resolve, 1000))
 
-    // Crear perfil en tabla users (fallback si trigger falla)
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        full_name: fullName.value.trim(),
-        role: role.value,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-
-    // Si hay error de perfil (ej. duplicado por trigger), ignorar
-    if (profileError && !profileError.message.includes('duplicate key')) {
-      console.warn('Profile creation warning:', profileError)
-    }
-
-    // Verificar estado de autenticación
+    // Verificar autenticación
     await authStore.checkAuth()
 
     if (authStore.isAuthenticated) {
@@ -146,15 +115,13 @@ const handleRegister = async () => {
     const error = err as Error
     console.error('Registration error:', error)
 
-    if (error.message.includes('User already registered')) {
-      errorMessage.value = 'El usuario ya está registrado. Intenta iniciar sesión.'
-    } else if (error.message.includes('Password should be at least')) {
-      errorMessage.value = 'La contraseña debe cumplir los requisitos de seguridad.'
-    } else if (error.message.includes('Invalid email')) {
-      errorMessage.value = 'Formato de email inválido.'
-    } else {
-      errorMessage.value = error.message || 'Error al registrar usuario'
-    }
+    errorMessage.value = error.message.includes('User already registered')
+      ? 'El usuario ya está registrado. Intenta iniciar sesión.'
+      : error.message.includes('Password should be at least')
+        ? 'La contraseña debe cumplir los requisitos de seguridad.'
+        : error.message.includes('Invalid email')
+          ? 'Formato de email inválido.'
+          : error.message || 'Error al registrar usuario'
   } finally {
     isLoading.value = false
   }
@@ -165,13 +132,10 @@ const handleRegister = async () => {
   <Card class="max-w-md mx-auto">
     <CardHeader>
       <CardTitle>Crear Cuenta</CardTitle>
-      <CardDescription>
-        Ingresa tus datos para crear una nueva cuenta
-      </CardDescription>
+      <CardDescription>Ingresa tus datos para crear una nueva cuenta</CardDescription>
     </CardHeader>
     <CardContent>
       <form class="space-y-4" @submit.prevent="handleRegister">
-        <!-- Nombre completo -->
         <div>
           <Label for="fullName">Nombre Completo</Label>
           <Input
@@ -179,16 +143,12 @@ const handleRegister = async () => {
             v-model="fullName"
             :class="{ 'border-destructive': errors.fullName }"
             placeholder="Juan Pérez"
-            required
             type="text"
             @blur="validateField('fullName')"
           />
-          <p v-if="errors.fullName" class="text-destructive text-sm mt-1">
-            {{ errors.fullName }}
-          </p>
+          <p v-if="errors.fullName" class="text-destructive text-sm mt-1">{{ errors.fullName }}</p>
         </div>
 
-        <!-- Email -->
         <div>
           <Label for="email">Email</Label>
           <Input
@@ -196,16 +156,12 @@ const handleRegister = async () => {
             v-model="email"
             :class="{ 'border-destructive': errors.email }"
             placeholder="juan@ejemplo.com"
-            required
             type="email"
             @blur="validateField('email')"
           />
-          <p v-if="errors.email" class="text-destructive text-sm mt-1">
-            {{ errors.email }}
-          </p>
+          <p v-if="errors.email" class="text-destructive text-sm mt-1">{{ errors.email }}</p>
         </div>
 
-        <!-- Contraseña -->
         <div>
           <Label for="password">Contraseña</Label>
           <Input
@@ -213,16 +169,12 @@ const handleRegister = async () => {
             v-model="password"
             :class="{ 'border-destructive': errors.password }"
             placeholder="********"
-            required
             type="password"
             @blur="validateField('password')"
           />
-          <p v-if="errors.password" class="text-destructive text-sm mt-1">
-            {{ errors.password }}
-          </p>
+          <p v-if="errors.password" class="text-destructive text-sm mt-1">{{ errors.password }}</p>
         </div>
 
-        <!-- Confirmar contraseña -->
         <div>
           <Label for="confirmPassword">Confirmar Contraseña</Label>
           <Input
@@ -230,16 +182,12 @@ const handleRegister = async () => {
             v-model="confirmPassword"
             :class="{ 'border-destructive': errors.confirmPassword }"
             placeholder="********"
-            required
             type="password"
             @blur="validateField('confirmPassword')"
           />
-          <p v-if="errors.confirmPassword" class="text-destructive text-sm mt-1">
-            {{ errors.confirmPassword }}
-          </p>
+          <p v-if="errors.confirmPassword" class="text-destructive text-sm mt-1">{{ errors.confirmPassword }}</p>
         </div>
 
-        <!-- Rol -->
         <div>
           <Label for="role">Rol</Label>
           <Select v-model="role" @update:model-value="validateField('role')">
@@ -251,17 +199,11 @@ const handleRegister = async () => {
               <SelectItem value="chief">Chief</SelectItem>
             </SelectContent>
           </Select>
-          <p v-if="errors.role" class="text-destructive text-sm mt-1">
-            {{ errors.role }}
-          </p>
+          <p v-if="errors.role" class="text-destructive text-sm mt-1">{{ errors.role }}</p>
         </div>
 
-        <!-- Error general -->
-        <div v-if="errorMessage" class="text-destructive text-sm">
-          {{ errorMessage }}
-        </div>
+        <div v-if="errorMessage" class="text-destructive text-sm">{{ errorMessage }}</div>
 
-        <!-- Botón registro -->
         <Button :disabled="isLoading" class="w-full" type="submit">
           <span v-if="isLoading" class="animate-spin mr-2">🔄</span>
           {{ isLoading ? 'Registrando...' : 'Crear Cuenta' }}
