@@ -1,140 +1,3 @@
-<template>
-  <div class="container mx-auto py-6">
-    <div v-if="loading" class="flex justify-center items-center h-64">
-      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-    </div>
-    <div v-else-if="!accommodation" class="text-center py-12">
-      <h2 class="text-2xl font-bold text-foreground">Accommodation no encontrado</h2>
-      <Button class="mt-4" @click="goBack">Volver a accommodations</Button>
-    </div>
-    <div v-else>
-      <div class="flex items-center mb-6">
-        <Button variant="outline" class="mr-4" @click="goBack">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-        </Button>
-        <h1 class="text-3xl font-bold text-foreground">{{ accommodation.code }} - {{ accommodation.name }}</h1>
-      </div>
-      
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2">
-          <Card class="mb-6">
-            <CardHeader>
-              <CardTitle>Información General</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-4">
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Código</Label>
-                  <p class="text-foreground">{{ accommodation.code }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Nombre</Label>
-                  <p class="text-foreground">{{ accommodation.name }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Dirección</Label>
-                  <p class="text-foreground">{{ accommodation.address || 'N/A' }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Estado</Label>
-                  <Badge :variant="getStatusVariant(accommodation.status)" class="ml-2">
-                    {{ formatStatus(accommodation.status) }}
-                  </Badge>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Áreas Configuradas</Label>
-                  <div class="mt-2 flex flex-wrap gap-2">
-                    <Badge 
-                      v-for="(elements, area) in accommodation.configured_areas" 
-                      :key="area" 
-                      variant="outline"
-                    >
-                      {{ formatAreaName(area) }} ({{ elements.length }} elementos)
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Tareas Recientes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div v-if="recentTasks && recentTasks.length > 0" class="space-y-4">
-                <div 
-                  v-for="task in recentTasks" 
-                  :key="task.id" 
-                  class="border-l-4 pl-4 py-2" 
-                  :class="getTaskPriorityBorder(task.priority)"
-                >
-                  <h3 class="font-medium text-foreground">{{ task.description }}</h3>
-                  <p class="text-sm text-muted-foreground">
-                    Prioridad: {{ formatPriority(task.priority) }} • Estado: {{ formatStatus(task.status) }}
-                  </p>
-                </div>
-              </div>
-              <div v-else class="text-center py-4 text-muted-foreground">
-                No hay tareas registradas
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div>
-          <Card class="mb-6">
-            <CardHeader>
-              <CardTitle>Resumen</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-4">
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Tareas Pendientes</span>
-                  <span class="font-medium">{{ summary.pendingTasks }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Tareas en Progreso</span>
-                  <span class="font-medium">{{ summary.inProgressTasks }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Tareas Completadas</span>
-                  <span class="font-medium">{{ summary.completedTasks }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-muted-foreground">Costo Total</span>
-                  <span class="font-medium">€{{ summary.totalCost.toFixed(2) }}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Acciones</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-3">
-                <Button class="w-full" @click="createNewTask">
-                  Crear Nueva Tarea
-                </Button>
-                <Button variant="outline" class="w-full" @click="editAccommodation">
-                  Editar Accommodation
-                </Button>
-                <Button variant="outline" class="w-full">
-                  Generar Reporte
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -292,3 +155,140 @@ onMounted(async () => {
   await loadAccommodationData()
 })
 </script>
+
+<template>
+  <div class="container mx-auto py-6">
+    <div v-if="loading" class="flex justify-center items-center h-64">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+    <div v-else-if="!accommodation" class="text-center py-12">
+      <h2 class="text-2xl font-bold text-foreground">Accommodation no encontrado</h2>
+      <Button class="mt-4" @click="goBack">Volver a accommodations</Button>
+    </div>
+    <div v-else>
+      <div class="flex items-center mb-6">
+        <Button variant="outline" class="mr-4" @click="goBack">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </Button>
+        <h1 class="text-3xl font-bold text-foreground">{{ accommodation.code }} - {{ accommodation.name }}</h1>
+      </div>
+      
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2">
+          <Card class="mb-6">
+            <CardHeader>
+              <CardTitle>Información General</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-4">
+                <div>
+                  <Label class="text-sm font-medium text-muted-foreground">Código</Label>
+                  <p class="text-foreground">{{ accommodation.code }}</p>
+                </div>
+                <div>
+                  <Label class="text-sm font-medium text-muted-foreground">Nombre</Label>
+                  <p class="text-foreground">{{ accommodation.name }}</p>
+                </div>
+                <div>
+                  <Label class="text-sm font-medium text-muted-foreground">Dirección</Label>
+                  <p class="text-foreground">{{ accommodation.address || 'N/A' }}</p>
+                </div>
+                <div>
+                  <Label class="text-sm font-medium text-muted-foreground">Estado</Label>
+                  <Badge :variant="getStatusVariant(accommodation.status)" class="ml-2">
+                    {{ formatStatus(accommodation.status) }}
+                  </Badge>
+                </div>
+                <div>
+                  <Label class="text-sm font-medium text-muted-foreground">Áreas Configuradas</Label>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <Badge 
+                      v-for="(elements, area) in accommodation.configured_areas" 
+                      :key="area" 
+                      variant="outline"
+                    >
+                      {{ formatAreaName(area) }} ({{ elements.length }} elementos)
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Tareas Recientes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div v-if="recentTasks && recentTasks.length > 0" class="space-y-4">
+                <div 
+                  v-for="task in recentTasks" 
+                  :key="task.id" 
+                  class="border-l-4 pl-4 py-2" 
+                  :class="getTaskPriorityBorder(task.priority)"
+                >
+                  <h3 class="font-medium text-foreground">{{ task.description }}</h3>
+                  <p class="text-sm text-muted-foreground">
+                    Prioridad: {{ formatPriority(task.priority) }} • Estado: {{ formatStatus(task.status) }}
+                  </p>
+                </div>
+              </div>
+              <div v-else class="text-center py-4 text-muted-foreground">
+                No hay tareas registradas
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <Card class="mb-6">
+            <CardHeader>
+              <CardTitle>Resumen</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-4">
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Tareas Pendientes</span>
+                  <span class="font-medium">{{ summary.pendingTasks }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Tareas en Progreso</span>
+                  <span class="font-medium">{{ summary.inProgressTasks }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Tareas Completadas</span>
+                  <span class="font-medium">{{ summary.completedTasks }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Costo Total</span>
+                  <span class="font-medium">€{{ summary.totalCost.toFixed(2) }}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Acciones</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div class="space-y-3">
+                <Button class="w-full" @click="createNewTask">
+                  Crear Nueva Tarea
+                </Button>
+                <Button variant="outline" class="w-full" @click="editAccommodation">
+                  Editar Accommodation
+                </Button>
+                <Button variant="outline" class="w-full">
+                  Generar Reporte
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

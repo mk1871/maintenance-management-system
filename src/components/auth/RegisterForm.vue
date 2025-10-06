@@ -1,189 +1,40 @@
-<template>
-  <div class="min-h-screen flex items-center justify-center bg-muted">
-    <Card class="w-full max-w-md">
-      <CardHeader class="text-center">
-        <CardTitle class="text-2xl font-bold">Crear Cuenta</CardTitle>
-        <CardDescription>Regístrese para acceder al sistema de gestión</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form @submit.prevent="handleRegister">
-          <div class="space-y-4">
-            <!-- Full Name field -->
-            <div>
-              <Label class="text-right" for="fullName">Nombre Completo</Label>
-              <Input
-                id="fullName"
-                v-model="fullName"
-                :class="{ 'border-destructive': errors.fullName }"
-                placeholder="Nombre Apellido"
-                required
-                type="text"
-                @blur="validateField('fullName')"
-              />
-              <p v-if="errors.fullName" class="mt-1 text-sm text-destructive">
-                {{ errors.fullName }}
-              </p>
-            </div>
-
-            <!-- Email field -->
-            <div>
-              <Label class="text-right" for="email">Email</Label>
-              <Input
-                id="email"
-                v-model="email"
-                :class="{ 'border-destructive': errors.email }"
-                autocomplete="email"
-                placeholder="nombre@ejemplo.com"
-                required
-                type="email"
-                @blur="validateField('email')"
-              />
-              <p v-if="errors.email" class="mt-1 text-sm text-destructive">{{ errors.email }}</p>
-            </div>
-
-            <!-- Password field -->
-            <div>
-              <Label class="text-right" for="password">Contraseña</Label>
-              <Input
-                id="password"
-                v-model="password"
-                :class="{ 'border-destructive': errors.password }"
-                placeholder="••••••••"
-                required
-                type="password"
-                @blur="validateField('password')"
-              />
-              <p v-if="errors.password" class="mt-1 text-sm text-destructive">
-                {{ errors.password }}
-              </p>
-            </div>
-
-            <!-- Confirm Password field -->
-            <div>
-              <Label class="text-right" for="confirmPassword">Confirmar Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                v-model="confirmPassword"
-                :class="{ 'border-destructive': errors.confirmPassword }"
-                placeholder="••••••••"
-                required
-                type="password"
-                @blur="validateField('confirmPassword')"
-              />
-              <p v-if="errors.confirmPassword" class="mt-1 text-sm text-destructive">
-                {{ errors.confirmPassword }}
-              </p>
-            </div>
-
-            <!-- Role selection -->
-            <div>
-              <Label class="text-right">Rol</Label>
-              <Select v-model="role" @update:modelValue="validateField('role')">
-                <SelectTrigger class="w-full">
-                  <SelectValue placeholder="Seleccione un rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="supervisor">Supervisor</SelectItem>
-                  <SelectItem value="chief">Jefe</SelectItem>
-                </SelectContent>
-              </Select>
-              <p v-if="errors.role" class="mt-1 text-sm text-destructive">{{ errors.role }}</p>
-            </div>
-          </div>
-
-          <!-- Error message -->
-          <div v-if="errorMessage" class="mt-4 rounded-md bg-destructive/10 p-4">
-            <div class="flex">
-              <div class="flex-shrink-0">
-                <svg class="h-5 w-5 text-destructive" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    clip-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 001.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    fill-rule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div class="ml-3">
-                <h3 class="text-sm font-medium text-destructive">
-                  {{ errorMessage }}
-                </h3>
-              </div>
-            </div>
-          </div>
-
-          <!-- Submit button -->
-          <Button :disabled="isLoading" class="mt-6 w-full" type="submit" variant="default">
-            <span v-if="!isLoading" class="flex items-center"> Crear Cuenta </span>
-            <span v-else class="flex items-center justify-center">
-              <svg
-                class="animate-spin -ml-1 mr-3 h-5 w-5 text-primary-foreground"
-                fill="none"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  fill="currentColor"
-                ></path>
-              </svg>
-              Procesando...
-            </span>
-          </Button>
-        </form>
-
-        <div class="mt-4 text-center text-sm">
-          ¿Ya tienes cuenta?
-          <RouterLink class="font-medium underline underline-offset-4 text-primary" to="/login">
-            Inicia sesión aquí
-          </RouterLink>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-</template>
-
 <script lang="ts" setup>
-import { reactive, ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/services/supabase'
+import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from 'vue-sonner'
+
+const router = useRouter()
+const authStore = useAuthStore()
 
 // State
 const fullName = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const role = ref<'supervisor' | 'chief' | null>(null)
+const role = ref<'supervisor' | 'chief'>('supervisor')
 const isLoading = ref(false)
 const errorMessage = ref('')
+
+// Validations
 const errors = reactive({
   fullName: '',
   email: '',
   password: '',
   confirmPassword: '',
-  role: '',
+  role: ''
 })
 
-const router = useRouter()
-
-// Validation
 const validateField = (field: string) => {
   switch (field) {
     case 'fullName':
-      if (!fullName.value) {
+      if (!fullName.value.trim()) {
         errors.fullName = 'Nombre completo requerido'
       } else if (fullName.value.trim().split(' ').length < 2) {
         errors.fullName = 'Ingrese nombre y apellido'
@@ -194,7 +45,7 @@ const validateField = (field: string) => {
     case 'email':
       if (!email.value) {
         errors.email = 'Email requerido'
-      } else if (!isValidEmail(email.value)) {
+      } else if (!/^\S+@\S+\.\S+$/.test(email.value)) {
         errors.email = 'Formato de email inválido'
       } else {
         errors.email = ''
@@ -205,6 +56,8 @@ const validateField = (field: string) => {
         errors.password = 'Contraseña requerida'
       } else if (password.value.length < 8) {
         errors.password = 'Mínimo 8 caracteres'
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password.value)) {
+        errors.password = 'Debe incluir mayúscula, minúscula y número'
       } else {
         errors.password = ''
       }
@@ -212,7 +65,7 @@ const validateField = (field: string) => {
     case 'confirmPassword':
       if (!confirmPassword.value) {
         errors.confirmPassword = 'Confirme la contraseña'
-      } else if (confirmPassword.value !== password.value) {
+      } else if (password.value !== confirmPassword.value) {
         errors.confirmPassword = 'Las contraseñas no coinciden'
       } else {
         errors.confirmPassword = ''
@@ -228,55 +81,192 @@ const validateField = (field: string) => {
   }
 }
 
-const isValidEmail = (email: string) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-const handleRegister = async () => {
-  // Reset errors
-  errorMessage.value = ''
-
-  // Validate all fields
+const validateAllFields = () => {
   validateField('fullName')
   validateField('email')
   validateField('password')
   validateField('confirmPassword')
   validateField('role')
+  return !Object.values(errors).some(error => error)
+}
 
-  // Check if there are validation errors
-  const hasErrors = Object.values(errors).some((error) => error !== '')
-  if (hasErrors) {
-    return
-  }
+const handleRegister = async () => {
+  errorMessage.value = ''
+
+  if (!validateAllFields()) return
 
   isLoading.value = true
 
   try {
-    // Sign up with Supabase Auth
-    const { error: authError, data } = await supabase.auth.signUp({
+    // Registrar usuario en Supabase Auth con nueva API
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.value,
       password: password.value,
       options: {
         data: {
-          full_name: fullName.value,
-          role: role.value,
-        },
-      },
+          full_name: fullName.value.trim(),
+          role: role.value
+        }
+      }
     })
 
-    if (authError) {
-      throw authError
+    if (authError) throw authError
+
+    if (!authData.user) {
+      throw new Error('No se pudo crear el usuario')
     }
 
-    // Redirect to login with success message
-    // The user profile should be created automatically via the trigger in Supabase
-    router.push('/login')
-  } catch (error: any) {
+    // Crear perfil en tabla users (fallback si trigger falla)
+    const { error: profileError } = await supabase
+      .from('users')
+      .insert({
+        id: authData.user.id,
+        full_name: fullName.value.trim(),
+        role: role.value,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+
+    // Si hay error de perfil (ej. duplicado por trigger), ignorar
+    if (profileError && !profileError.message.includes('duplicate key')) {
+      console.warn('Profile creation warning:', profileError)
+    }
+
+    // Verificar estado de autenticación
+    await authStore.checkAuth()
+
+    if (authStore.isAuthenticated) {
+      toast.success(`¡Registro exitoso! Bienvenido, ${fullName.value}`)
+      router.push({ name: 'Home' })
+    } else {
+      toast.success('Registro completado. Por favor, inicia sesión.')
+      router.push({ name: 'Login' })
+    }
+  } catch (err: unknown) {
+    const error = err as Error
     console.error('Registration error:', error)
-    errorMessage.value = error?.message || 'Error al registrar el usuario'
+
+    if (error.message.includes('User already registered')) {
+      errorMessage.value = 'El usuario ya está registrado. Intenta iniciar sesión.'
+    } else if (error.message.includes('Password should be at least')) {
+      errorMessage.value = 'La contraseña debe cumplir los requisitos de seguridad.'
+    } else if (error.message.includes('Invalid email')) {
+      errorMessage.value = 'Formato de email inválido.'
+    } else {
+      errorMessage.value = error.message || 'Error al registrar usuario'
+    }
   } finally {
     isLoading.value = false
   }
 }
 </script>
+
+<template>
+  <Card class="max-w-md mx-auto">
+    <CardHeader>
+      <CardTitle>Crear Cuenta</CardTitle>
+      <CardDescription>
+        Ingresa tus datos para crear una nueva cuenta
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <form class="space-y-4" @submit.prevent="handleRegister">
+        <!-- Nombre completo -->
+        <div>
+          <Label for="fullName">Nombre Completo</Label>
+          <Input
+            id="fullName"
+            v-model="fullName"
+            :class="{ 'border-destructive': errors.fullName }"
+            placeholder="Juan Pérez"
+            required
+            type="text"
+            @blur="validateField('fullName')"
+          />
+          <p v-if="errors.fullName" class="text-destructive text-sm mt-1">
+            {{ errors.fullName }}
+          </p>
+        </div>
+
+        <!-- Email -->
+        <div>
+          <Label for="email">Email</Label>
+          <Input
+            id="email"
+            v-model="email"
+            :class="{ 'border-destructive': errors.email }"
+            placeholder="juan@ejemplo.com"
+            required
+            type="email"
+            @blur="validateField('email')"
+          />
+          <p v-if="errors.email" class="text-destructive text-sm mt-1">
+            {{ errors.email }}
+          </p>
+        </div>
+
+        <!-- Contraseña -->
+        <div>
+          <Label for="password">Contraseña</Label>
+          <Input
+            id="password"
+            v-model="password"
+            :class="{ 'border-destructive': errors.password }"
+            placeholder="********"
+            required
+            type="password"
+            @blur="validateField('password')"
+          />
+          <p v-if="errors.password" class="text-destructive text-sm mt-1">
+            {{ errors.password }}
+          </p>
+        </div>
+
+        <!-- Confirmar contraseña -->
+        <div>
+          <Label for="confirmPassword">Confirmar Contraseña</Label>
+          <Input
+            id="confirmPassword"
+            v-model="confirmPassword"
+            :class="{ 'border-destructive': errors.confirmPassword }"
+            placeholder="********"
+            required
+            type="password"
+            @blur="validateField('confirmPassword')"
+          />
+          <p v-if="errors.confirmPassword" class="text-destructive text-sm mt-1">
+            {{ errors.confirmPassword }}
+          </p>
+        </div>
+
+        <!-- Rol -->
+        <div>
+          <Label for="role">Rol</Label>
+          <Select v-model="role" @update:model-value="validateField('role')">
+            <SelectTrigger :class="{ 'border-destructive': errors.role }">
+              <SelectValue placeholder="Selecciona un rol" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="supervisor">Supervisor</SelectItem>
+              <SelectItem value="chief">Chief</SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.role" class="text-destructive text-sm mt-1">
+            {{ errors.role }}
+          </p>
+        </div>
+
+        <!-- Error general -->
+        <div v-if="errorMessage" class="text-destructive text-sm">
+          {{ errorMessage }}
+        </div>
+
+        <!-- Botón registro -->
+        <Button :disabled="isLoading" class="w-full" type="submit">
+          <span v-if="isLoading" class="animate-spin mr-2">🔄</span>
+          {{ isLoading ? 'Registrando...' : 'Crear Cuenta' }}
+        </Button>
+      </form>
+    </CardContent>
+  </Card>
+</template>

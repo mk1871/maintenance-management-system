@@ -1,59 +1,3 @@
-<template>
-  <div class="container mx-auto py-6">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold text-foreground">Tareas de Mantenimiento</h1>
-      <TaskForm />
-    </div>
-    
-    <Card>
-      <CardContent class="p-0">
-        <div class="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Accommodation</TableHead>
-                <TableHead>Área/Elemento</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="task in tasks" :key="task.id" class="hover:bg-muted/50">
-                <TableCell>{{ task.accommodation?.code }} - {{ task.accommodation?.name }}</TableCell>
-                <TableCell>{{ formatAreaName(task.area) }} / {{ formatElementName(task.element) }}</TableCell>
-                <TableCell>{{ task.description }}</TableCell>
-                <TableCell>
-                  <Badge :variant="getPriorityVariant(task.priority)">
-                    {{ getPriorityEmoji(task.priority) }} {{ formatPriority(task.priority) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getStatusVariant(task.status)">
-                    {{ formatStatus(task.status) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>{{ formatDate(task.due_date) }}</TableCell>
-                <TableCell>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    @click="$router.push(`/tasks/${task.id}`)"
-                  >
-                    Ver
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -166,3 +110,59 @@ onMounted(async () => {
   }
 })
 </script>
+
+<template>
+  <div class="container mx-auto py-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold text-foreground">Tareas de Mantenimiento</h1>
+      <TaskForm />
+    </div>
+    
+    <Card>
+      <CardContent class="p-0">
+        <div class="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Accommodation</TableHead>
+                <TableHead>Área/Elemento</TableHead>
+                <TableHead>Descripción</TableHead>
+                <TableHead>Prioridad</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Vencimiento</TableHead>
+                <TableHead>Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="task in tasks" :key="task.id" class="hover:bg-muted/50">
+                <TableCell>{{ task.accommodation?.code }} - {{ task.accommodation?.name }}</TableCell>
+                <TableCell>{{ formatAreaName(task.area) }} / {{ formatElementName(task.element) }}</TableCell>
+                <TableCell>{{ task.description }}</TableCell>
+                <TableCell>
+                  <Badge :variant="getPriorityVariant(task.priority)">
+                    {{ getPriorityEmoji(task.priority) }} {{ formatPriority(task.priority) }}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge :variant="getStatusVariant(task.status)">
+                    {{ formatStatus(task.status) }}
+                  </Badge>
+                </TableCell>
+                <TableCell>{{ formatDate(task.due_date) }}</TableCell>
+                <TableCell>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    @click="$router.push(`/tasks/${task.id}`)"
+                  >
+                    Ver
+                  </Button>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+</template>

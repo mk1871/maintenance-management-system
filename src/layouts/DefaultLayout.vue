@@ -1,3 +1,34 @@
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { Button } from '@/components/ui/button'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+// Verificar autenticación al cargar la aplicación
+onMounted(async () => {
+  await authStore.checkAuth()
+})
+
+const handleLogout = async () => {
+  await authStore.clearAuth()
+  router.push('/login')
+}
+
+const formatRole = (role: string | null) => {
+  if (!role) return 'Usuario'
+  
+  const roleNames: Record<string, string> = {
+    'supervisor': 'Supervisor',
+    'chief': 'Jefe'
+  }
+  
+  return roleNames[role] || role
+}
+</script>
+
 <template>
   <div v-if="authStore.isLoading" class="h-screen flex items-center justify-center">
     <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -93,34 +124,3 @@
     <RouterView />
   </div>
 </template>
-
-<script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { Button } from '@/components/ui/button'
-
-const router = useRouter()
-const authStore = useAuthStore()
-
-// Verificar autenticación al cargar la aplicación
-onMounted(async () => {
-  await authStore.checkAuth()
-})
-
-const handleLogout = async () => {
-  await authStore.clearAuth()
-  router.push('/login')
-}
-
-const formatRole = (role: string | null) => {
-  if (!role) return 'Usuario'
-  
-  const roleNames: Record<string, string> = {
-    'supervisor': 'Supervisor',
-    'chief': 'Jefe'
-  }
-  
-  return roleNames[role] || role
-}
-</script>

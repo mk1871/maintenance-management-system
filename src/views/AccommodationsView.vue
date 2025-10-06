@@ -1,3 +1,48 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import AccommodationForm from '@/components/accommodations/AccommodationForm.vue'
+import { accommodationService, type Accommodation } from '@/composables/accommodationService'
+
+// Datos de accommodations
+const accommodations = ref<Accommodation[]>([])
+
+// Funciones para formatear datos
+const formatStatus = (status: string) => {
+  const statusNames: Record<string, string> = {
+    'active': 'Activo',
+    'inactive': 'Inactivo'
+  }
+  return statusNames[status] || status
+}
+
+const getStatusVariant = (status: string) => {
+  const variants: Record<string, string> = {
+    'active': 'default',
+    'inactive': 'secondary'
+  }
+  return variants[status] || 'default'
+}
+
+// Cargar accommodations
+const loadAccommodations = async () => {
+  try {
+    accommodations.value = await accommodationService.getAll()
+  } catch (error) {
+    console.error('Error al cargar accommodations:', error)
+    // Aquí podrías mostrar un toast o mensaje de error
+  }
+}
+
+// Cargar accommodations cuando se monte el componente
+onMounted(async () => {
+  await loadAccommodations()
+})
+</script>
+
 <template>
   <div class="container mx-auto py-6">
     <div class="flex justify-between items-center mb-6">
@@ -47,48 +92,3 @@
     </Card>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import AccommodationForm from '@/components/accommodations/AccommodationForm.vue'
-import { accommodationService, type Accommodation } from '@/composables/accommodationService'
-
-// Datos de accommodations
-const accommodations = ref<Accommodation[]>([])
-
-// Funciones para formatear datos
-const formatStatus = (status: string) => {
-  const statusNames: Record<string, string> = {
-    'active': 'Activo',
-    'inactive': 'Inactivo'
-  }
-  return statusNames[status] || status
-}
-
-const getStatusVariant = (status: string) => {
-  const variants: Record<string, string> = {
-    'active': 'default',
-    'inactive': 'secondary'
-  }
-  return variants[status] || 'default'
-}
-
-// Cargar accommodations
-const loadAccommodations = async () => {
-  try {
-    accommodations.value = await accommodationService.getAll()
-  } catch (error) {
-    console.error('Error al cargar accommodations:', error)
-    // Aquí podrías mostrar un toast o mensaje de error
-  }
-}
-
-// Cargar accommodations cuando se monte el componente
-onMounted(async () => {
-  await loadAccommodations()
-})
-</script>

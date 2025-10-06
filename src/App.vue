@@ -1,3 +1,20 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import DefaultLayout from '@/layouts/DefaultLayout.vue'
+import { Toaster } from '@/components/ui/sonner'
+import { Button } from '@/components/ui/button'
+import 'vue-sonner/style.css'
+
+const authStore = useAuthStore()
+
+const handleRetryAuth = async () => {
+  authStore.clearError()
+  authStore.clearAuth()
+  await authStore.checkAuth()
+}
+</script>
+
 <template>
   <div id="app" class="h-screen bg-background text-foreground">
     <Toaster class="pointer-events-auto" />
@@ -17,20 +34,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import DefaultLayout from '@/layouts/DefaultLayout.vue'
-import { Toaster } from '@/components/ui/sonner'
-import { Button } from '@/components/ui/button'
-import 'vue-sonner/style.css'
-
-const authStore = useAuthStore()
-
-const handleRetryAuth = async () => {
-  authStore.clearError()
-  authStore.clearAuth()
-  await authStore.checkAuth()
-}
-</script>

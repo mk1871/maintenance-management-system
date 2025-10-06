@@ -1,3 +1,294 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from '@/components/ui/sonner'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table'
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog'
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select'
+import { taskService, type Task } from '@/composables/taskService'
+import { costService, type CreateCostData } from '@/composables/costService'
+
+// Variables
+const route = useRoute()
+const router = useRouter()
+
+const taskId = ref(route.params.id as string)
+const task = ref<Task | null>(null)
+const costs = ref<any[]>([])
+const loading = ref(true)
+const repairerName = ref('')
+const newComment = ref('')
+const showCostForm = ref(false)
+const newCost = ref<CreateCostData>({
+  task_id: taskId.value,
+  amount: 0,
+  category: 'materials',
+  description: '',
+  accommodation_id: '' // Este valor se debe obtener del task
+})
+const costError = ref('')
+const beforePhotos = ref<any[]>([])
+const duringPhotos = ref<any[]>([])
+const afterPhotos = ref<any[]>([])
+
+// Cargar la tarea y costos
+const loadTaskData = async () => {
+  try {
+    loading.value = true
+    const taskData = await taskService.getById(taskId.value)
+    if (!taskData) {
+      toast.error('La tarea no fue encontrada')
+      return
+    }
+    
+    task.value = taskData
+    newCost.value.accommodation_id = taskData.accommodation_id
+    
+    // Cargar costos de esta tarea
+    costs.value = await costService.getByTaskId(taskId.value)
+  } catch (error) {
+    console.error('Error al cargar los datos de la tarea:', error)
+    toast.error('Error al cargar los datos de la tarea')
+  } finally {
+    loading.value = false
+  }
+}
+
+// Funciones para formatear datos
+const formatAreaName = (area: string) => {
+  const areaNames: Record<string, string> = {
+    'living_room': 'Sala de Estar',
+    'kitchen': 'Cocina',
+    'bathroom_1': 'Baño Principal',
+    'bathroom_2': 'Segundo Baño',
+    'bedroom_1': 'Dormitorio Principal',
+    'bedroom_2': 'Segundo Dormitorio',
+    'bedroom_3': 'Tercer Dormitorio',
+    'terrace': 'Terraza',
+    'garage': 'Garaje'
+  }
+  return areaNames[area] || area
+}
+
+const formatElementName = (element: string) => {
+  const elementNames: Record<string, string> = {
+    'pipe': 'Cañería',
+    'toilet': 'Inodoro',
+    'sink': 'Fregadero',
+    'shower': 'Ducha',
+    'refrigerator': 'Refrigerador',
+    'stove': 'Estufa'
+  }
+  return elementNames[element] || element
+}
+
+const formatPriority = (priority: string) => {
+  const priorityNames: Record<string, string> = {
+    'low': 'Baja',
+    'medium': 'Media',
+    'high': 'Alta'
+  }
+  return priorityNames[priority] || priority
+}
+
+const getPriorityEmoji = (priority: string) => {
+  const priorityEmojis: Record<string, string> = {
+    'low': '🟢',
+    'medium': '🟡',
+    'high': '🔴'
+  }
+  return priorityEmojis[priority] || ''
+}
+
+const getPriorityVariant = (priority: string) => {
+  const variants: Record<string, any> = {
+    'low': 'secondary',
+    'medium': 'default',
+    'high': 'destructive'
+  }
+  return variants[priority] || 'default'
+}
+
+const formatStatus = (status: string) => {
+  const statusNames: Record<string, string> = {
+    'pending': 'Pendiente',
+    'in_progress': 'En Progreso',
+    'completed': 'Completada',
+    'cancelled': 'Cancelada'
+  }
+  return statusNames[status] || status
+}
+
+const getStatusVariant = (status: string) => {
+  const variants: Record<string, any> = {
+    'pending': 'secondary',
+    'in_progress': 'default',
+    'completed': 'success',
+    'cancelled': 'destructive'
+  }
+  return variants[status] || 'default'
+}
+
+const formatCostCategory = (category: string) => {
+  const categoryNames: Record<string, string> = {
+    'materials': 'Materiales',
+    'labor': 'Mano de Obra',
+    'tools': 'Herramientas',
+    'transport': 'Transporte',
+    'other': 'Otros'
+  }
+  return categoryNames[category] || category
+}
+
+const formatDate = (date: string | null) => {
+  if (!date) return 'N/A'
+  return new Intl.DateTimeFormat('es-ES').format(new Date(date))
+}
+
+// Funciones de negocio
+const calculateTotalCosts = () => {
+  return costs.value.reduce((sum, cost) => sum + cost.amount, 0)
+}
+
+const startRepair = async () => {
+  if (!repairerName.value.trim()) {
+    toast.error('Por favor ingrese el nombre del reparador')
+    return
+  }
+  
+  try {
+    // Actualizar el estado de la tarea a "in_progress"
+    await taskService.update({
+      id: taskId.value,
+      status: 'in_progress',
+      repairer_name: repairerName.value,
+      start_date: new Date().toISOString()
+    })
+    
+    // Actualizar la tarea en la vista
+    await loadTaskData()
+    
+    toast.success('Tarea iniciada exitosamente')
+  } catch (error) {
+    console.error('Error al iniciar la tarea:', error)
+    toast.error('Error al iniciar la tarea')
+  }
+}
+
+const completeTask = async () => {
+  // Aquí podría mostrar un modal para ingresar la solución
+  try {
+    await taskService.update({
+      id: taskId.value,
+      status: 'completed',
+      completed_date: new Date().toISOString(),
+      solution: 'Reparación completada'
+    })
+    
+    // Actualizar la tarea en la vista
+    await loadTaskData()
+    
+    toast.success('Tarea completada exitosamente')
+  } catch (error) {
+    console.error('Error al completar la tarea:', error)
+    toast.error('Error al completar la tarea')
+  }
+}
+
+const addComment = () => {
+  if (!newComment.value.trim()) {
+    toast.error('El comentario no puede estar vacío')
+    return
+  }
+  
+  // Aquí iría la lógica para guardar comentarios, que no está implementada completamente
+  // ya que la tabla comments no tiene CRUD completo en los servicios
+  console.log('Agregar comentario:', newComment.value)
+  toast.info('Funcionalidad de comentarios aún no implementada')
+  newComment.value = ''
+}
+
+const saveCost = async () => {
+  // Validar los datos
+  if (!newCost.value.amount || newCost.value.amount <= 0) {
+    costError.value = 'El importe debe ser mayor a 0'
+    return
+  }
+  
+  try {
+    // Crear el nuevo costo
+    const createdCost = await costService.create({
+      ...newCost.value,
+      task_id: taskId.value,
+      accommodation_id: task.value?.accommodation_id || '',
+      amount: newCost.value.amount,
+      category: newCost.value.category,
+      description: newCost.value.description
+    })
+    
+    // Actualizar la lista de costos
+    costs.value = [createdCost, ...costs.value]
+    
+    // Resetear el formulario
+    newCost.value = {
+      task_id: taskId.value,
+      amount: 0,
+      category: 'materials',
+      description: '',
+      accommodation_id: task.value?.accommodation_id || ''
+    }
+    
+    // Cerrar el diálogo
+    showCostForm.value = false
+    
+    toast.success('Costo registrado exitosamente')
+  } catch (error) {
+    console.error('Error al guardar el costo:', error)
+    toast.error('Error al registrar el costo')
+  }
+}
+
+const duplicateTask = () => {
+  console.log('Duplicar tarea')
+  // Aquí iría la lógica para duplicar la tarea
+  toast.info('Funcionalidad de duplicar tarea aún no implementada')
+}
+
+const goBack = () => {
+  router.push('/tasks')
+}
+
+onMounted(async () => {
+  await loadTaskData()
+})
+</script>
+
 <template>
   <div class="container mx-auto py-6">
     <div v-if="loading" class="flex justify-center items-center h-64">
@@ -364,294 +655,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { toast } from '@/components/ui/sonner'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select'
-import { taskService, type Task } from '@/composables/taskService'
-import { costService, type CreateCostData } from '@/composables/costService'
-
-// Variables
-const route = useRoute()
-const router = useRouter()
-
-const taskId = ref(route.params.id as string)
-const task = ref<Task | null>(null)
-const costs = ref<any[]>([])
-const loading = ref(true)
-const repairerName = ref('')
-const newComment = ref('')
-const showCostForm = ref(false)
-const newCost = ref<CreateCostData>({
-  task_id: taskId.value,
-  amount: 0,
-  category: 'materials',
-  description: '',
-  accommodation_id: '' // Este valor se debe obtener del task
-})
-const costError = ref('')
-const beforePhotos = ref<any[]>([])
-const duringPhotos = ref<any[]>([])
-const afterPhotos = ref<any[]>([])
-
-// Cargar la tarea y costos
-const loadTaskData = async () => {
-  try {
-    loading.value = true
-    const taskData = await taskService.getById(taskId.value)
-    if (!taskData) {
-      toast.error('La tarea no fue encontrada')
-      return
-    }
-    
-    task.value = taskData
-    newCost.value.accommodation_id = taskData.accommodation_id
-    
-    // Cargar costos de esta tarea
-    costs.value = await costService.getByTaskId(taskId.value)
-  } catch (error) {
-    console.error('Error al cargar los datos de la tarea:', error)
-    toast.error('Error al cargar los datos de la tarea')
-  } finally {
-    loading.value = false
-  }
-}
-
-// Funciones para formatear datos
-const formatAreaName = (area: string) => {
-  const areaNames: Record<string, string> = {
-    'living_room': 'Sala de Estar',
-    'kitchen': 'Cocina',
-    'bathroom_1': 'Baño Principal',
-    'bathroom_2': 'Segundo Baño',
-    'bedroom_1': 'Dormitorio Principal',
-    'bedroom_2': 'Segundo Dormitorio',
-    'bedroom_3': 'Tercer Dormitorio',
-    'terrace': 'Terraza',
-    'garage': 'Garaje'
-  }
-  return areaNames[area] || area
-}
-
-const formatElementName = (element: string) => {
-  const elementNames: Record<string, string> = {
-    'pipe': 'Cañería',
-    'toilet': 'Inodoro',
-    'sink': 'Fregadero',
-    'shower': 'Ducha',
-    'refrigerator': 'Refrigerador',
-    'stove': 'Estufa'
-  }
-  return elementNames[element] || element
-}
-
-const formatPriority = (priority: string) => {
-  const priorityNames: Record<string, string> = {
-    'low': 'Baja',
-    'medium': 'Media',
-    'high': 'Alta'
-  }
-  return priorityNames[priority] || priority
-}
-
-const getPriorityEmoji = (priority: string) => {
-  const priorityEmojis: Record<string, string> = {
-    'low': '🟢',
-    'medium': '🟡',
-    'high': '🔴'
-  }
-  return priorityEmojis[priority] || ''
-}
-
-const getPriorityVariant = (priority: string) => {
-  const variants: Record<string, any> = {
-    'low': 'secondary',
-    'medium': 'default',
-    'high': 'destructive'
-  }
-  return variants[priority] || 'default'
-}
-
-const formatStatus = (status: string) => {
-  const statusNames: Record<string, string> = {
-    'pending': 'Pendiente',
-    'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'cancelled': 'Cancelada'
-  }
-  return statusNames[status] || status
-}
-
-const getStatusVariant = (status: string) => {
-  const variants: Record<string, any> = {
-    'pending': 'secondary',
-    'in_progress': 'default',
-    'completed': 'success',
-    'cancelled': 'destructive'
-  }
-  return variants[status] || 'default'
-}
-
-const formatCostCategory = (category: string) => {
-  const categoryNames: Record<string, string> = {
-    'materials': 'Materiales',
-    'labor': 'Mano de Obra',
-    'tools': 'Herramientas',
-    'transport': 'Transporte',
-    'other': 'Otros'
-  }
-  return categoryNames[category] || category
-}
-
-const formatDate = (date: string | null) => {
-  if (!date) return 'N/A'
-  return new Intl.DateTimeFormat('es-ES').format(new Date(date))
-}
-
-// Funciones de negocio
-const calculateTotalCosts = () => {
-  return costs.value.reduce((sum, cost) => sum + cost.amount, 0)
-}
-
-const startRepair = async () => {
-  if (!repairerName.value.trim()) {
-    toast.error('Por favor ingrese el nombre del reparador')
-    return
-  }
-  
-  try {
-    // Actualizar el estado de la tarea a "in_progress"
-    await taskService.update({
-      id: taskId.value,
-      status: 'in_progress',
-      repairer_name: repairerName.value,
-      start_date: new Date().toISOString()
-    })
-    
-    // Actualizar la tarea en la vista
-    await loadTaskData()
-    
-    toast.success('Tarea iniciada exitosamente')
-  } catch (error) {
-    console.error('Error al iniciar la tarea:', error)
-    toast.error('Error al iniciar la tarea')
-  }
-}
-
-const completeTask = async () => {
-  // Aquí podría mostrar un modal para ingresar la solución
-  try {
-    await taskService.update({
-      id: taskId.value,
-      status: 'completed',
-      completed_date: new Date().toISOString(),
-      solution: 'Reparación completada'
-    })
-    
-    // Actualizar la tarea en la vista
-    await loadTaskData()
-    
-    toast.success('Tarea completada exitosamente')
-  } catch (error) {
-    console.error('Error al completar la tarea:', error)
-    toast.error('Error al completar la tarea')
-  }
-}
-
-const addComment = () => {
-  if (!newComment.value.trim()) {
-    toast.error('El comentario no puede estar vacío')
-    return
-  }
-  
-  // Aquí iría la lógica para guardar comentarios, que no está implementada completamente
-  // ya que la tabla comments no tiene CRUD completo en los servicios
-  console.log('Agregar comentario:', newComment.value)
-  toast.info('Funcionalidad de comentarios aún no implementada')
-  newComment.value = ''
-}
-
-const saveCost = async () => {
-  // Validar los datos
-  if (!newCost.value.amount || newCost.value.amount <= 0) {
-    costError.value = 'El importe debe ser mayor a 0'
-    return
-  }
-  
-  try {
-    // Crear el nuevo costo
-    const createdCost = await costService.create({
-      ...newCost.value,
-      task_id: taskId.value,
-      accommodation_id: task.value?.accommodation_id || '',
-      amount: newCost.value.amount,
-      category: newCost.value.category,
-      description: newCost.value.description
-    })
-    
-    // Actualizar la lista de costos
-    costs.value = [createdCost, ...costs.value]
-    
-    // Resetear el formulario
-    newCost.value = {
-      task_id: taskId.value,
-      amount: 0,
-      category: 'materials',
-      description: '',
-      accommodation_id: task.value?.accommodation_id || ''
-    }
-    
-    // Cerrar el diálogo
-    showCostForm.value = false
-    
-    toast.success('Costo registrado exitosamente')
-  } catch (error) {
-    console.error('Error al guardar el costo:', error)
-    toast.error('Error al registrar el costo')
-  }
-}
-
-const duplicateTask = () => {
-  console.log('Duplicar tarea')
-  // Aquí iría la lógica para duplicar la tarea
-  toast.info('Funcionalidad de duplicar tarea aún no implementada')
-}
-
-const goBack = () => {
-  router.push('/tasks')
-}
-
-onMounted(async () => {
-  await loadTaskData()
-})
-</script>

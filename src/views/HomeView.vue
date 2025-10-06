@@ -1,3 +1,7 @@
+<script setup lang="ts">
+// HomeView component - Dashboard principal
+</script>
+
 <template>
   <div class="container mx-auto py-6">
     <h1 class="text-3xl font-bold text-foreground mb-6">Dashboard</h1>
@@ -21,7 +25,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-// HomeView component - Dashboard principal
-</script>

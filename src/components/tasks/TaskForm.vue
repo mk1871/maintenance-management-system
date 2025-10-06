@@ -1,161 +1,3 @@
-<template>
-  <Dialog>
-    <DialogTrigger as-child>
-      <Button>
-        <svg
-          class="mr-2 h-4 w-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-          />
-        </svg>
-        Nueva Tarea
-      </Button>
-    </DialogTrigger>
-    <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>Crear Nueva Tarea de Mantenimiento</DialogTitle>
-        <DialogDescription>
-          Complete los campos siguientes para crear una nueva tarea
-        </DialogDescription>
-      </DialogHeader>
-      <div class="grid gap-4 py-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Accommodation selection -->
-          <div class="space-y-2">
-            <Label for="accommodation">Accommodation</Label>
-            <Select v-model="formData.accommodation_id" @update:modelValue="onAccommodationChange">
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un accommodation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="acc in accommodations" :key="acc.id" :value="acc.id">
-                  {{ acc.code }} - {{ acc.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <!-- Area selection -->
-          <div class="space-y-2">
-            <Label for="area">Área</Label>
-            <Select v-model="formData.area" :disabled="!formData.accommodation_id">
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un área" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="area in areas" :key="area" :value="area">
-                  {{ formatAreaName(area) }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <!-- Element selection -->
-          <div class="space-y-2">
-            <Label for="element">Elemento</Label>
-            <Select v-model="formData.element" :disabled="!formData.area">
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione un elemento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="element in elements" :key="element" :value="element">
-                  {{ formatElementName(element) }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <!-- Priority selection -->
-          <div class="space-y-2">
-            <Label for="priority">Prioridad</Label>
-            <Select v-model="formData.priority">
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccione prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">
-                  <div class="flex items-center"><span class="mr-2">🟢</span> Baja</div>
-                </SelectItem>
-                <SelectItem value="medium">
-                  <div class="flex items-center"><span class="mr-2">🟡</span> Media</div>
-                </SelectItem>
-                <SelectItem value="high">
-                  <div class="flex items-center"><span class="mr-2">🔴</span> Alta</div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <!-- Description -->
-        <div class="space-y-2">
-          <Label for="description">Descripción del problema</Label>
-          <Textarea
-            id="description"
-            v-model="formData.description"
-            :class="{ 'border-destructive': errors.description }"
-            placeholder="Describa detalladamente el problema detectado..."
-            @blur="validateField('description')"
-          />
-          <p v-if="errors.description" class="text-sm text-destructive">{{ errors.description }}</p>
-        </div>
-
-        <!-- Due date -->
-        <div class="space-y-2">
-          <Label for="dueDate">Fecha de vencimiento</Label>
-          <Input
-            id="dueDate"
-            v-model="formData.due_date"
-            :class="{ 'border-destructive': errors.due_date }"
-            type="date"
-            @blur="validateField('due_date')"
-          />
-          <p v-if="errors.due_date" class="text-sm text-destructive">{{ errors.due_date }}</p>
-        </div>
-
-        <!-- Tags -->
-        <div class="space-y-2">
-          <Label for="tags">Etiquetas</Label>
-          <div class="flex flex-wrap gap-2">
-            <Badge
-              v-for="tag in availableTags"
-              :key="tag.id"
-              :variant="formData.tags.includes(tag.id) ? 'default' : 'secondary'"
-              class="cursor-pointer"
-              @click="toggleTag(tag.id)"
-            >
-              {{ tag.name }}
-            </Badge>
-          </div>
-        </div>
-
-        <!-- Estimated cost -->
-        <div class="space-y-2">
-          <Label for="estimatedCost">Costo estimado (€)</Label>
-          <Input
-            id="estimatedCost"
-            v-model="formData.estimated_cost"
-            placeholder="0.00"
-            step="0.01"
-            type="number"
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button :disabled="!isFormValid" @click="handleCreate">Crear Tarea</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-</template>
-
 <script lang="ts" setup>
 import { computed, onBeforeMount, onMounted, reactive, ref } from 'vue'
 import { toast } from '@/components/ui/sonner'
@@ -395,3 +237,161 @@ onMounted(() => {
   formData.value.due_date = tomorrow.toISOString().split('T')[0]
 })
 </script>
+
+<template>
+  <Dialog>
+    <DialogTrigger as-child>
+      <Button>
+        <svg
+          class="mr-2 h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+          />
+        </svg>
+        Nueva Tarea
+      </Button>
+    </DialogTrigger>
+    <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>Crear Nueva Tarea de Mantenimiento</DialogTitle>
+        <DialogDescription>
+          Complete los campos siguientes para crear una nueva tarea
+        </DialogDescription>
+      </DialogHeader>
+      <div class="grid gap-4 py-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Accommodation selection -->
+          <div class="space-y-2">
+            <Label for="accommodation">Accommodation</Label>
+            <Select v-model="formData.accommodation_id" @update:modelValue="onAccommodationChange">
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione un accommodation" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="acc in accommodations" :key="acc.id" :value="acc.id">
+                  {{ acc.code }} - {{ acc.name }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Area selection -->
+          <div class="space-y-2">
+            <Label for="area">Área</Label>
+            <Select v-model="formData.area" :disabled="!formData.accommodation_id">
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione un área" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="area in areas" :key="area" :value="area">
+                  {{ formatAreaName(area) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Element selection -->
+          <div class="space-y-2">
+            <Label for="element">Elemento</Label>
+            <Select v-model="formData.element" :disabled="!formData.area">
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione un elemento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="element in elements" :key="element" :value="element">
+                  {{ formatElementName(element) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <!-- Priority selection -->
+          <div class="space-y-2">
+            <Label for="priority">Prioridad</Label>
+            <Select v-model="formData.priority">
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione prioridad" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">
+                  <div class="flex items-center"><span class="mr-2">🟢</span> Baja</div>
+                </SelectItem>
+                <SelectItem value="medium">
+                  <div class="flex items-center"><span class="mr-2">🟡</span> Media</div>
+                </SelectItem>
+                <SelectItem value="high">
+                  <div class="flex items-center"><span class="mr-2">🔴</span> Alta</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="space-y-2">
+          <Label for="description">Descripción del problema</Label>
+          <Textarea
+            id="description"
+            v-model="formData.description"
+            :class="{ 'border-destructive': errors.description }"
+            placeholder="Describa detalladamente el problema detectado..."
+            @blur="validateField('description')"
+          />
+          <p v-if="errors.description" class="text-sm text-destructive">{{ errors.description }}</p>
+        </div>
+
+        <!-- Due date -->
+        <div class="space-y-2">
+          <Label for="dueDate">Fecha de vencimiento</Label>
+          <Input
+            id="dueDate"
+            v-model="formData.due_date"
+            :class="{ 'border-destructive': errors.due_date }"
+            type="date"
+            @blur="validateField('due_date')"
+          />
+          <p v-if="errors.due_date" class="text-sm text-destructive">{{ errors.due_date }}</p>
+        </div>
+
+        <!-- Tags -->
+        <div class="space-y-2">
+          <Label for="tags">Etiquetas</Label>
+          <div class="flex flex-wrap gap-2">
+            <Badge
+              v-for="tag in availableTags"
+              :key="tag.id"
+              :variant="formData.tags.includes(tag.id) ? 'default' : 'secondary'"
+              class="cursor-pointer"
+              @click="toggleTag(tag.id)"
+            >
+              {{ tag.name }}
+            </Badge>
+          </div>
+        </div>
+
+        <!-- Estimated cost -->
+        <div class="space-y-2">
+          <Label for="estimatedCost">Costo estimado (€)</Label>
+          <Input
+            id="estimatedCost"
+            v-model="formData.estimated_cost"
+            placeholder="0.00"
+            step="0.01"
+            type="number"
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button :disabled="!isFormValid" @click="handleCreate">Crear Tarea</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+</template>
