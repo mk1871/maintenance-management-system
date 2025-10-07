@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
 
@@ -23,11 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Spinner } from '@/components/ui/spinner'
 
 // Composables
-import { accommodationService, type CreateAccommodationData } from '@/composables/accommodationService'
+import {
+  accommodationService,
+  type CreateAccommodationData,
+} from '@/composables/accommodationService'
 
 // Emits
 const emit = defineEmits<{
@@ -42,7 +44,6 @@ interface FormData {
   name: string
   address: string
   status: 'active' | 'inactive'
-  areas: Record<string, boolean>
 }
 
 interface AreaOption {
@@ -79,13 +80,22 @@ const formData = ref<FormData>({
   name: '',
   address: '',
   status: 'active',
-  areas: AREA_OPTIONS.reduce(
-    (acc, option) => ({ ...acc, [option.value]: false }),
-    {} as Record<string, boolean>
-  ),
 })
 
-const errors = reactive<FormErrors>({
+// Áreas seleccionadas
+const areas = ref<Record<string, boolean>>({
+  living_room: false,
+  kitchen: false,
+  bathroom_1: false,
+  bathroom_2: false,
+  bedroom_1: false,
+  bedroom_2: false,
+  bedroom_3: false,
+  terrace: false,
+  garage: false,
+})
+
+const errors = ref<FormErrors>({
   code: '',
   name: '',
 })
@@ -94,10 +104,17 @@ const isSubmitting = ref(false)
 const isDialogOpen = ref(false)
 
 /**
+ * Contador de áreas seleccionadas
+ */
+const selectedAreasCount = computed(() => {
+  return Object.values(areas.value).filter(Boolean).length
+})
+
+/**
  * Valida que al menos un área esté seleccionada
  */
 const hasSelectedAreas = computed(() => {
-  return Object.values(formData.value.areas).some((selected) => selected)
+  return selectedAreasCount.value > 0
 })
 
 /**
@@ -105,8 +122,8 @@ const hasSelectedAreas = computed(() => {
  */
 const isFormValid = computed(() => {
   return (
-    !errors.code &&
-    !errors.name &&
+    !errors.value.code &&
+    !errors.value.name &&
     formData.value.code.length >= MIN_CODE_LENGTH &&
     formData.value.name.length >= MIN_NAME_LENGTH &&
     hasSelectedAreas.value
@@ -120,21 +137,21 @@ const validateCode = (): void => {
   const code = formData.value.code.trim()
 
   if (!code) {
-    errors.code = 'El código es requerido'
+    errors.value.code = 'El código es requerido'
     return
   }
 
   if (code.length < MIN_CODE_LENGTH || code.length > MAX_CODE_LENGTH) {
-    errors.code = `El código debe tener entre ${MIN_CODE_LENGTH} y ${MAX_CODE_LENGTH} caracteres`
+    errors.value.code = `El código debe tener entre ${MIN_CODE_LENGTH} y ${MAX_CODE_LENGTH} caracteres`
     return
   }
 
   if (!CODE_PATTERN.test(code)) {
-    errors.code = 'Solo se permiten letras mayúsculas y números'
+    errors.value.code = 'Solo se permiten letras mayúsculas y números'
     return
   }
 
-  errors.code = ''
+  errors.value.code = ''
 }
 
 /**
@@ -144,24 +161,24 @@ const validateName = (): void => {
   const name = formData.value.name.trim()
 
   if (!name) {
-    errors.name = 'El nombre es requerido'
+    errors.value.name = 'El nombre es requerido'
     return
   }
 
   if (name.length < MIN_NAME_LENGTH) {
-    errors.name = `El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`
+    errors.value.name = `El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`
     return
   }
 
-  errors.name = ''
+  errors.value.name = ''
 }
 
 /**
- * Convierte el objeto de áreas seleccionadas al formato de base de datos
+ * Convierte el objeto de áreas al formato de base de datos
  */
 const buildConfiguredAreas = (): Record<string, string[]> => {
   return Object.fromEntries(
-    Object.entries(formData.value.areas)
+    Object.entries(areas.value)
       .filter(([, isSelected]) => isSelected)
       .map(([areaKey]) => [areaKey, []])
   )
@@ -176,13 +193,20 @@ const resetForm = (): void => {
     name: '',
     address: '',
     status: 'active',
-    areas: AREA_OPTIONS.reduce(
-      (acc, option) => ({ ...acc, [option.value]: false }),
-      {} as Record<string, boolean>
-    ),
   }
-  errors.code = ''
-  errors.name = ''
+  areas.value = {
+    living_room: false,
+    kitchen: false,
+    bathroom_1: false,
+    bathroom_2: false,
+    bedroom_1: false,
+    bedroom_2: false,
+    bedroom_3: false,
+    terrace: false,
+    garage: false,
+  }
+  errors.value.code = ''
+  errors.value.name = ''
 }
 
 /**
@@ -225,13 +249,6 @@ const handleCreate = async (): Promise<void> => {
     isSubmitting.value = false
   }
 }
-
-/**
- * Maneja el cambio del checkbox de área
- */
-const handleAreaChange = (areaValue: string, checked: boolean): void => {
-  formData.value.areas[areaValue] = checked
-}
 </script>
 
 <template>
@@ -252,9 +269,7 @@ const handleAreaChange = (areaValue: string, checked: boolean): void => {
         <div class="space-y-2">
           <Label>
             Código *
-            <span class="text-xs text-muted-foreground ml-2">
-              (2-4 caracteres: A-Z, 0-9)
-            </span>
+            <span class="text-xs text-muted-foreground ml-2"> (2-4 caracteres: A-Z, 0-9) </span>
           </Label>
           <Input
             v-model="formData.code"
@@ -286,10 +301,7 @@ const handleAreaChange = (areaValue: string, checked: boolean): void => {
         <!-- Dirección -->
         <div class="space-y-2">
           <Label>Dirección</Label>
-          <Input
-            v-model="formData.address"
-            placeholder="Ej: Calle Mayor 123, 3º B"
-          />
+          <Input v-model="formData.address" placeholder="Ej: Calle Mayor 123, 3º B" />
           <p class="text-xs text-muted-foreground">Opcional</p>
         </div>
 
@@ -307,7 +319,7 @@ const handleAreaChange = (areaValue: string, checked: boolean): void => {
           </Select>
         </div>
 
-        <!-- Áreas -->
+        <!-- Áreas con checkbox estilizado como shadcn-vue -->
         <div class="space-y-2">
           <Label>Áreas del Alojamiento *</Label>
           <p class="text-sm text-muted-foreground mb-2">
@@ -319,20 +331,26 @@ const handleAreaChange = (areaValue: string, checked: boolean): void => {
               :key="option.value"
               class="flex items-center space-x-2"
             >
-              <Checkbox
+              <input
                 :id="option.value"
-                :checked="formData.areas[option.value]"
-                @update:checked="(checked: boolean) => handleAreaChange(option.value, checked)"
+                v-model="areas[option.value]"
+                class="peer h-4 w-4 shrink-0 rounded-[4px] border border-input shadow-xs transition-shadow cursor-pointer
+               focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring
+               disabled:cursor-not-allowed disabled:opacity-50
+               checked:bg-primary checked:text-primary-foreground checked:border-primary
+               hover:border-ring/50"
+                type="checkbox"
               />
-              <Label :for="option.value" class="cursor-pointer">
+              <Label :for="option.value" class="cursor-pointer text-sm font-normal">
                 {{ option.label }}
               </Label>
             </div>
           </div>
           <p class="text-xs text-muted-foreground">
-            Áreas seleccionadas: {{ Object.values(formData.areas).filter(Boolean).length }}
+            Áreas seleccionadas: {{ selectedAreasCount }}
           </p>
         </div>
+
       </div>
 
       <DialogFooter class="gap-2">
