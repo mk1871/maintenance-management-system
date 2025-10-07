@@ -1,245 +1,407 @@
-<script setup lang="ts">
-import { ref, computed } from 'vue'
+<script lang="ts" setup>
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import {
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  RefreshCw,
+  CalendarIcon,
+} from 'lucide-vue-next'
+import type { DateValue } from '@internationalized/date'
+import { DateFormatter, getLocalTimeZone } from '@internationalized/date'
+
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableFooter, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 
-// Simulación de datos
-const accommodations = ref([
-  { id: '1', code: 'ABC1', name: 'Apartamento Central' },
-  { id: '2', code: 'XYZ2', name: 'Loft Moderno' }
-])
+import { costService, type Cost } from '@/composables/costService'
+import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 
-// Simulación de costos
-const costs = ref([
-  {
-    id: '1',
-    task_id: '1234',
-    accommodation_id: '1',
-    amount: 15.50,
-    category: 'materials',
-    description: 'Tubo de reparación',
-    provider: 'Ferretería López',
-    expense_date: new Date('2025-10-06'),
-  },
-  {
-    id: '2',
-    task_id: '1235',
-    accommodation_id: '2',
-    amount: 120.00,
-    category: 'labor',
-    description: 'Servicio técnico',
-    provider: 'Juan Pérez Reparaciones',
-    expense_date: new Date('2025-10-07'),
-  },
-  {
-    id: '3',
-    task_id: '1236',
-    accommodation_id: '1',
-    amount: 45.75,
-    category: 'materials',
-    description: 'Pintura para habitación',
-    provider: 'Color Express',
-    expense_date: new Date('2025-09-20'),
-  }
-])
+const router = useRouter()
 
-// Filtros
+// Configuración
+const LOCALE = 'es-ES'
+const TIME_ZONE = getLocalTimeZone()
+const dateFormatter = new DateFormatter(LOCALE, { dateStyle: 'medium' })
+
+// Estado de datos
+const costs = ref<Cost[]>([])
+const accommodations = ref<Accommodation[]>([])
+const isLoading = ref(true)
+const isRefreshing = ref(false)
+
+// Filtros - usar unknown como en TaskForm
 const filters = ref({
-  startDate: '',
-  endDate: '',
+  startDate: undefined as unknown,
+  endDate: undefined as unknown,
   accommodationId: 'all',
   category: 'all',
-  minAmount: ''
+  minAmount: '',
 })
 
-// Funciones de filtrado
+/**
+ * Maneja cambio de fecha de inicio
+ */
+const handleStartDateChange = (value: DateValue | undefined): void => {
+  filters.value.startDate = value
+}
+
+/**
+ * Maneja cambio de fecha de fin
+ */
+const handleEndDateChange = (value: DateValue | undefined): void => {
+  filters.value.endDate = value
+}
+
+/**
+ * Carga los datos iniciales
+ */
+const loadData = async (): Promise<void> => {
+  try {
+    isLoading.value = true
+    const [costsData, accommodationsData] = await Promise.all([
+      costService.getAll(),
+      accommodationService.getAll(),
+    ])
+    costs.value = costsData
+    accommodations.value = accommodationsData
+  } catch (error: unknown) {
+    console.error(error)
+    toast.error('Error al cargar los costos')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+/**
+ * Refresca los datos
+ */
+const handleRefresh = async (): Promise<void> => {
+  isRefreshing.value = true
+  await loadData()
+  isRefreshing.value = false
+  toast.success('Costos actualizados')
+}
+
+/**
+ * Limpia los filtros
+ */
+const clearFilters = (): void => {
+  filters.value = {
+    startDate: undefined,
+    endDate: undefined,
+    accommodationId: 'all',
+    category: 'all',
+    minAmount: '',
+  }
+}
+
+/**
+ * Costos filtrados según criterios
+ */
 const filteredCosts = computed(() => {
   let result = [...costs.value]
-  
-  // Filtrar por fecha
+
   if (filters.value.startDate) {
-    const startDate = new Date(filters.value.startDate)
-    result = result.filter(cost => new Date(cost.expense_date) >= startDate)
+    const startDate = (filters.value.startDate as DateValue).toDate(TIME_ZONE)
+    result = result.filter((cost) => new Date(cost.expense_date) >= startDate)
   }
-  
+
   if (filters.value.endDate) {
-    const endDate = new Date(filters.value.endDate)
-    endDate.setHours(23, 59, 59, 999) // Hasta el final del día
-    result = result.filter(cost => new Date(cost.expense_date) <= endDate)
+    const endDate = (filters.value.endDate as DateValue).toDate(TIME_ZONE)
+    endDate.setHours(23, 59, 59, 999)
+    result = result.filter((cost) => new Date(cost.expense_date) <= endDate)
   }
-  
-  // Filtrar por accommodation
+
   if (filters.value.accommodationId !== 'all') {
-    result = result.filter(cost => cost.accommodation_id === filters.value.accommodationId)
+    result = result.filter((cost) => cost.accommodation_id === filters.value.accommodationId)
   }
-  
-  // Filtrar por categoría
+
   if (filters.value.category !== 'all') {
-    result = result.filter(cost => cost.category === filters.value.category)
+    result = result.filter((cost) => cost.category === filters.value.category)
   }
-  
-  // Filtrar por monto mínimo
+
   if (filters.value.minAmount) {
-    const min = parseFloat(filters.value.minAmount)
-    result = result.filter(cost => cost.amount >= min)
+    const minAmount = parseFloat(filters.value.minAmount)
+    result = result.filter((cost) => cost.amount >= minAmount)
   }
-  
+
   return result
 })
 
-// Funciones para calcular resúmenes
+/**
+ * Total de todos los costos
+ */
 const totalCosts = computed(() => {
   return costs.value.reduce((sum, cost) => sum + cost.amount, 0)
 })
 
+/**
+ * Costos del mes actual
+ */
 const monthlyCosts = computed(() => {
   const currentMonth = new Date().getMonth()
   const currentYear = new Date().getFullYear()
-  
+
   return costs.value
-    .filter(cost => {
+    .filter((cost) => {
       const costDate = new Date(cost.expense_date)
       return costDate.getMonth() === currentMonth && costDate.getFullYear() === currentYear
     })
     .reduce((sum, cost) => sum + cost.amount, 0)
 })
 
+/**
+ * Costos del año actual
+ */
 const annualCosts = computed(() => {
   const currentYear = new Date().getFullYear()
-  
+
   return costs.value
-    .filter(cost => {
+    .filter((cost) => {
       const costDate = new Date(cost.expense_date)
       return costDate.getFullYear() === currentYear
     })
     .reduce((sum, cost) => sum + cost.amount, 0)
 })
 
+/**
+ * Promedio de costo por tarea única
+ */
 const averagePerTask = computed(() => {
   if (costs.value.length === 0) return 0
-  return totalCosts.value / new Set(costs.value.map(c => c.task_id)).size
+  const uniqueTasks = new Set(costs.value.map((cost) => cost.task_id))
+  return totalCosts.value / uniqueTasks.size
 })
 
-// Funciones auxiliares
-const formatDate = (date: Date | string) => {
-  return new Intl.DateTimeFormat('es-ES').format(new Date(date))
-}
-
-const getAccommodationCode = (accommodationId: string) => {
-  const accommodation = accommodations.value.find(acc => acc.id === accommodationId)
-  return accommodation ? accommodation.code : 'N/A'
-}
-
-const formatCostCategory = (category: string) => {
-  const categoryNames: Record<string, string> = {
-    'materials': 'Materiales',
-    'labor': 'Mano de Obra',
-    'tools': 'Herramientas',
-    'transport': 'Transporte',
-    'other': 'Otros'
-  }
-  return categoryNames[category] || category
-}
-
-const calculateFilteredTotal = () => {
+/**
+ * Total de costos filtrados
+ */
+const filteredTotal = computed(() => {
   return filteredCosts.value.reduce((sum, cost) => sum + cost.amount, 0)
+})
+
+/**
+ * Formatea fecha a texto local
+ */
+const formatDate = (date: string | Date): string => {
+  return new Date(date).toLocaleDateString(LOCALE, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
-// Funciones de acción
-const applyFilters = () => {
-  console.log('Filtros aplicados:', filters.value)
-  // En una implementación real, se haría una llamada a la API con los filtros
+/**
+ * Obtiene el código del alojamiento
+ */
+const getAccommodationCode = (accommodationId: string): string => {
+  const accommodation = accommodations.value.find((acc) => acc.id === accommodationId)
+  return accommodation?.code ?? 'N/A'
 }
 
-const clearFilters = () => {
-  filters.value = {
-    startDate: '',
-    endDate: '',
-    accommodationId: 'all',
-    category: 'all',
-    minAmount: ''
+/**
+ * Formatea la categoría del costo a español
+ */
+const formatCostCategory = (category: string): string => {
+  const categories: Record<string, string> = {
+    materials: 'Materiales',
+    labor: 'Mano de Obra',
+    tools: 'Herramientas',
+    transport: 'Transporte',
+    other: 'Otros',
   }
+  return categories[category] ?? category
 }
 
-const exportToExcel = () => {
-  console.log('Exportando a Excel')
-  // En una implementación real, se usaría una librería como xlsx para exportar
+/**
+ * Retorna variante de badge según categoría
+ */
+const getCategoryVariant = (category: string): 'default' | 'secondary' | 'outline' => {
+  const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
+    materials: 'default',
+    labor: 'secondary',
+    tools: 'outline',
+    transport: 'outline',
+    other: 'outline',
+  }
+  return variants[category] ?? 'outline'
 }
 
-const exportToPDF = () => {
-  console.log('Exportando a PDF')
-  // En una implementación real, se usaría una librería como jsPDF o similar
+/**
+ * Navega al detalle de la tarea
+ */
+const viewTask = (taskId: string): void => {
+  router.push(`/tasks/${taskId}`)
 }
+
+/**
+ * Exporta datos a Excel
+ */
+const exportToExcel = (): void => {
+  toast.info('Función de exportar a Excel en desarrollo')
+}
+
+/**
+ * Exporta datos a PDF
+ */
+const exportToPDF = (): void => {
+  toast.info('Función de exportar a PDF en desarrollo')
+}
+
+onMounted(async () => {
+  await loadData()
+})
 </script>
 
 <template>
-  <div class="container mx-auto py-6">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold text-foreground">Costos</h1>
-      <div class="flex space-x-4">
-        <Button variant="outline" @click="exportToExcel">
-          Exportar a Excel
+  <div class="container mx-auto py-8 space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Costos</h1>
+        <p class="text-muted-foreground mt-1">
+          Gestiona y analiza todos los costos de mantenimiento
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <Button :disabled="isRefreshing" size="icon" variant="outline" @click="handleRefresh">
+          <RefreshCw :class="{ 'animate-spin': isRefreshing }" class="h-4 w-4" />
         </Button>
-        <Button @click="exportToPDF">
-          Exportar a PDF
+        <Button variant="outline" @click="exportToExcel">
+          <FileSpreadsheet class="h-4 w-4 mr-2" />
+          Excel
+        </Button>
+        <Button variant="outline" @click="exportToPDF">
+          <FileText class="h-4 w-4 mr-2" />
+          PDF
         </Button>
       </div>
     </div>
-    
+
     <!-- Filtros -->
-    <Card class="mb-6">
-      <CardContent class="p-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <Label for="date-range">Rango de Fechas</Label>
-            <div class="flex space-x-2">
-              <Input 
-                id="start-date" 
-                v-model="filters.startDate" 
-                type="date" 
-              />
-              <span class="self-center">a</span>
-              <Input 
-                id="end-date" 
-                v-model="filters.endDate" 
-                type="date" 
-              />
-            </div>
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2">
+          <Filter class="h-5 w-5" />
+          Filtros
+        </CardTitle>
+        <CardDescription>Filtra los costos según tus criterios</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Fecha inicio -->
+          <div class="space-y-2">
+            <Label>Fecha Inicio</Label>
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  :class="
+                    cn(
+                      'w-full justify-start text-left font-normal',
+                      !filters.startDate && 'text-muted-foreground',
+                    )
+                  "
+                  type="button"
+                  variant="outline"
+                >
+                  <CalendarIcon class="mr-2 h-4 w-4" />
+                  {{
+                    filters.startDate
+                      ? dateFormatter.format((filters.startDate as DateValue).toDate(TIME_ZONE))
+                      : 'Seleccionar fecha'
+                  }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" class="w-auto p-0">
+                <Calendar
+                  :locale="'es'"
+                  :model-value="filters.startDate as DateValue"
+                  initial-focus
+                  @update:model-value="handleStartDateChange"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
-          
-          <div>
-            <Label for="accommodation">Accommodation</Label>
+
+          <!-- Fecha fin -->
+          <div class="space-y-2">
+            <Label>Fecha Fin</Label>
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  :class="
+                    cn(
+                      'w-full justify-start text-left font-normal',
+                      !filters.endDate && 'text-muted-foreground',
+                    )
+                  "
+                  type="button"
+                  variant="outline"
+                >
+                  <CalendarIcon class="mr-2 h-4 w-4" />
+                  {{
+                    filters.endDate
+                      ? dateFormatter.format((filters.endDate as DateValue).toDate(TIME_ZONE))
+                      : 'Seleccionar fecha'
+                  }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" class="w-auto p-0">
+                <Calendar
+                  :locale="'es'"
+                  :model-value="filters.endDate as DateValue"
+                  initial-focus
+                  @update:model-value="handleEndDateChange"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <!-- Alojamiento -->
+          <div class="space-y-2">
+            <Label>Alojamiento</Label>
             <Select v-model="filters.accommodationId">
               <SelectTrigger>
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem 
-                  v-for="acc in accommodations" 
-                  :key="acc.id" 
-                  :value="acc.id"
-                >
+                <SelectItem v-for="acc in accommodations" :key="acc.id" :value="acc.id">
                   {{ acc.code }} - {{ acc.name }}
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
-          
-          <div>
-            <Label for="category">Categoría</Label>
+
+          <!-- Categoría -->
+          <div class="space-y-2">
+            <Label>Categoría</Label>
             <Select v-model="filters.category">
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
@@ -254,108 +416,143 @@ const exportToPDF = () => {
               </SelectContent>
             </Select>
           </div>
-          
-          <div>
-            <Label for="minAmount">Monto Mínimo</Label>
-            <Input 
-              id="minAmount" 
-              v-model="filters.minAmount" 
-              type="number" 
-              placeholder="Mínimo" 
-            />
+        </div>
+
+        <!-- Monto mínimo y botones -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+          <div class="space-y-2">
+            <Label>Monto Mínimo (€)</Label>
+            <Input v-model="filters.minAmount" placeholder="0.00" step="0.01" type="number" />
+          </div>
+          <div class="md:col-span-3 flex items-end justify-end gap-2">
+            <Button variant="ghost" @click="clearFilters">Limpiar filtros</Button>
           </div>
         </div>
-        
-        <div class="flex justify-end mt-4">
-          <Button @click="applyFilters" variant="default">
-            Aplicar Filtros
-          </Button>
-          <Button @click="clearFilters" variant="outline" class="ml-2">
-            Limpiar
-          </Button>
-        </div>
       </CardContent>
     </Card>
-    
-    <!-- Tarjetas resumen -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-      <Card>
-        <CardContent class="p-6">
-          <p class="text-sm text-muted-foreground">Costo Total</p>
-          <p class="text-2xl font-bold">€{{ totalCosts.toFixed(2) }}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent class="p-6">
-          <p class="text-sm text-muted-foreground">Este Mes</p>
-          <p class="text-2xl font-bold">€{{ monthlyCosts.toFixed(2) }}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent class="p-6">
-          <p class="text-sm text-muted-foreground">Este Año</p>
-          <p class="text-2xl font-bold">€{{ annualCosts.toFixed(2) }}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent class="p-6">
-          <p class="text-sm text-muted-foreground">Promedio por Reparación</p>
-          <p class="text-2xl font-bold">€{{ averagePerTask.toFixed(2) }}</p>
-        </CardContent>
-      </Card>
+
+    <!-- Loading State -->
+    <div v-if="isLoading" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Skeleton v-for="i in 4" :key="i" class="h-32 w-full" />
       </div>
-    
-    <!-- Tabla de costos -->
-    <Card>
-      <CardContent class="p-0">
-        <div class="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Accommodation</TableHead>
-                <TableHead>Tarea</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Importe</TableHead>
-                <TableHead>Proveedor</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="cost in filteredCosts" :key="cost.id">
-                <TableCell>{{ formatDate(cost.expense_date) }}</TableCell>
-                <TableCell>{{ getAccommodationCode(cost.accommodation_id) }}</TableCell>
-                <TableCell>
-                  <RouterLink 
-                    :to="`/tasks/${cost.task_id}`" 
-                    class="text-primary hover:underline"
+      <Skeleton class="h-96 w-full" />
+    </div>
+
+    <!-- Content -->
+    <div v-else class="space-y-6">
+      <!-- Tarjetas resumen -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Costo Total</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-3xl font-bold">€{{ totalCosts.toFixed(2) }}</p>
+            <p class="text-xs text-muted-foreground mt-1">Todos los tiempos</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Este Mes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-3xl font-bold">€{{ monthlyCosts.toFixed(2) }}</p>
+            <p class="text-xs text-muted-foreground mt-1">Mes actual</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle class="text-sm font-medium text-muted-foreground">Este Año</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-3xl font-bold">€{{ annualCosts.toFixed(2) }}</p>
+            <p class="text-xs text-muted-foreground mt-1">Año actual</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle class="text-sm font-medium text-muted-foreground">
+              Promedio/Tarea
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p class="text-3xl font-bold">€{{ averagePerTask.toFixed(2) }}</p>
+            <p class="text-xs text-muted-foreground mt-1">Por reparación</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <!-- Tabla de costos -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de Costos</CardTitle>
+          <CardDescription>{{ filteredCosts.length }} costo(s) encontrado(s)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div v-if="filteredCosts.length > 0" class="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Alojamiento</TableHead>
+                  <TableHead>Tarea</TableHead>
+                  <TableHead>Categoría</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead class="text-right">Importe</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="cost in filteredCosts" :key="cost.id" class="hover:bg-muted/50">
+                  <TableCell>{{ formatDate(cost.expense_date) }}</TableCell>
+                  <TableCell class="font-medium">
+                    {{ getAccommodationCode(cost.accommodation_id) }}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      class="p-0 h-auto"
+                      size="sm"
+                      variant="link"
+                      @click="viewTask(cost.task_id)"
+                    >
+                      #{{ cost.task_id.substring(0, 8) }}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    <Badge :variant="getCategoryVariant(cost.category)">
+                      {{ formatCostCategory(cost.category) }}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div :title="cost.description" class="max-w-xs truncate">
+                      {{ cost.description || 'Sin descripción' }}
+                    </div>
+                  </TableCell>
+                  <TableCell class="text-right font-medium"
+                    >€{{ cost.amount.toFixed(2) }}</TableCell
                   >
-                    #{{ cost.task_id }}
-                  </RouterLink>
-                </TableCell>
-                <TableCell>{{ formatCostCategory(cost.category) }}</TableCell>
-                <TableCell>{{ cost.description || 'N/A' }}</TableCell>
-                <TableCell>€{{ cost.amount.toFixed(2) }}</TableCell>
-                <TableCell>{{ cost.provider || 'N/A' }}</TableCell>
-                <TableCell>
-                  <div class="flex space-x-2">
-                    <Button size="sm" variant="outline">Editar</Button>
-                    <Button size="sm" variant="outline">Eliminar</Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell colspan="5" class="text-right font-bold">Total:</TableCell>
-                <TableCell>€{{ calculateFilteredTotal().toFixed(2) }}</TableCell>
-                <TableCell colspan="2"></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+                </TableRow>
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell class="text-right font-bold" colspan="5">Total Filtrado:</TableCell>
+                  <TableCell class="text-right font-bold"
+                    >€{{ filteredTotal.toFixed(2) }}</TableCell
+                  >
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </div>
+          <div v-else class="text-center py-12 text-muted-foreground">
+            <Download class="h-16 w-16 mx-auto mb-4 opacity-50" />
+            <p>No hay costos con los filtros aplicados</p>
+            <Button class="mt-4" variant="outline" @click="clearFilters">Limpiar filtros</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   </div>
 </template>

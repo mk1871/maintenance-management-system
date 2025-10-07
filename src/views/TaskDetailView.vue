@@ -1,286 +1,334 @@
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script lang="ts" setup>
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { toast } from '@/components/ui/sonner'
+import { toast } from 'vue-sonner'
+import {
+  ArrowLeft,
+  Calendar,
+  DollarSign,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+} from 'lucide-vue-next'
+
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
-import { taskService, type Task } from '@/composables/taskService'
-import { costService, type CreateCostData } from '@/composables/costService'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 
-// Variables
+import { taskService, type Task } from '@/composables/taskService'
+import { costService, type CreateCostData, type Cost } from '@/composables/costService'
+
 const route = useRoute()
 const router = useRouter()
 
-const taskId = ref(route.params.id as string)
+// Estado de datos
+const taskId = route.params.id as string
 const task = ref<Task | null>(null)
-const costs = ref<any[]>([])
-const loading = ref(true)
+const costs = ref<Cost[]>([])
+const isLoading = ref(true)
+
+// Estado del formulario de reparación
 const repairerName = ref('')
-const newComment = ref('')
-const showCostForm = ref(false)
+
+// Estado del formulario de costos
+const showCostDialog = ref(false)
+const isSavingCost = ref(false)
 const newCost = ref<CreateCostData>({
-  task_id: taskId.value,
+  task_id: taskId,
   amount: 0,
   category: 'materials',
   description: '',
-  accommodation_id: '' // Este valor se debe obtener del task
+  accommodation_id: '',
 })
-const costError = ref('')
-const beforePhotos = ref<any[]>([])
-const duringPhotos = ref<any[]>([])
-const afterPhotos = ref<any[]>([])
+const costErrors = ref({
+  amount: '',
+  description: '',
+})
 
-// Cargar la tarea y costos
-const loadTaskData = async () => {
+/**
+ * Carga los datos de la tarea y sus costos
+ */
+const loadTaskData = async (): Promise<void> => {
   try {
-    loading.value = true
-    const taskData = await taskService.getById(taskId.value)
+    isLoading.value = true
+    const [taskData, costsData] = await Promise.all([
+      taskService.getById(taskId),
+      costService.getByTaskId(taskId),
+    ])
+
     if (!taskData) {
-      toast.error('La tarea no fue encontrada')
+      toast.error('Tarea no encontrada')
+      router.push('/tasks')
       return
     }
-    
+
     task.value = taskData
+    costs.value = costsData || []
     newCost.value.accommodation_id = taskData.accommodation_id
-    
-    // Cargar costos de esta tarea
-    costs.value = await costService.getByTaskId(taskId.value)
-  } catch (error) {
-    console.error('Error al cargar los datos de la tarea:', error)
+  } catch (err: unknown) {
+    console.error(err)
     toast.error('Error al cargar los datos de la tarea')
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 
-// Funciones para formatear datos
-const formatAreaName = (area: string) => {
+/**
+ * Calcula el costo total de la tarea
+ */
+const totalCost = computed(() => {
+  return costs.value.reduce((sum, cost) => sum + cost.amount, 0)
+})
+
+/**
+ * Formatea el nombre del área
+ */
+const formatAreaName = (area: string): string => {
   const areaNames: Record<string, string> = {
-    'living_room': 'Sala de Estar',
-    'kitchen': 'Cocina',
-    'bathroom_1': 'Baño Principal',
-    'bathroom_2': 'Segundo Baño',
-    'bedroom_1': 'Dormitorio Principal',
-    'bedroom_2': 'Segundo Dormitorio',
-    'bedroom_3': 'Tercer Dormitorio',
-    'terrace': 'Terraza',
-    'garage': 'Garaje'
+    living_room: 'Sala de Estar',
+    kitchen: 'Cocina',
+    bathroom_1: 'Baño Principal',
+    bathroom_2: 'Segundo Baño',
+    bedroom_1: 'Dormitorio Principal',
+    bedroom_2: 'Segundo Dormitorio',
+    bedroom_3: 'Tercer Dormitorio',
+    terrace: 'Terraza',
+    garage: 'Garaje',
   }
   return areaNames[area] || area
 }
 
-const formatElementName = (element: string) => {
-  const elementNames: Record<string, string> = {
-    'pipe': 'Cañería',
-    'toilet': 'Inodoro',
-    'sink': 'Fregadero',
-    'shower': 'Ducha',
-    'refrigerator': 'Refrigerador',
-    'stove': 'Estufa'
-  }
-  return elementNames[element] || element
+/**
+ * Formatea el nombre del elemento
+ */
+const formatElementName = (element: string): string => {
+  return element.charAt(0).toUpperCase() + element.slice(1).replace(/_/g, ' ')
 }
 
-const formatPriority = (priority: string) => {
-  const priorityNames: Record<string, string> = {
-    'low': 'Baja',
-    'medium': 'Media',
-    'high': 'Alta'
+/**
+ * Formatea la prioridad
+ */
+const formatPriority = (priority: string): string => {
+  const priorities: Record<string, string> = {
+    low: 'Baja',
+    medium: 'Media',
+    high: 'Alta',
   }
-  return priorityNames[priority] || priority
+  return priorities[priority] || priority
 }
 
-const getPriorityEmoji = (priority: string) => {
-  const priorityEmojis: Record<string, string> = {
-    'low': '🟢',
-    'medium': '🟡',
-    'high': '🔴'
+/**
+ * Variante de badge para prioridad
+ */
+const getPriorityVariant = (priority: string): 'default' | 'destructive' | 'secondary' => {
+  const variants: Record<string, 'default' | 'destructive' | 'secondary'> = {
+    low: 'secondary',
+    medium: 'default',
+    high: 'destructive',
   }
-  return priorityEmojis[priority] || ''
+  return variants[priority] ?? 'default'
 }
 
-const getPriorityVariant = (priority: string) => {
-  const variants: Record<string, any> = {
-    'low': 'secondary',
-    'medium': 'default',
-    'high': 'destructive'
+/**
+ * Formatea el estado
+ */
+const formatStatus = (status: string): string => {
+  const statuses: Record<string, string> = {
+    pending: 'Pendiente',
+    in_progress: 'En Progreso',
+    completed: 'Completada',
+    cancelled: 'Cancelada',
   }
-  return variants[priority] || 'default'
+  return statuses[status] || status
 }
 
-const formatStatus = (status: string) => {
-  const statusNames: Record<string, string> = {
-    'pending': 'Pendiente',
-    'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'cancelled': 'Cancelada'
+/**
+ * Variante de badge para estado
+ */
+const getStatusVariant = (status: string): 'default' | 'secondary' | 'outline' => {
+  const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
+    pending: 'outline',
+    in_progress: 'default',
+    completed: 'secondary',
+    cancelled: 'outline',
   }
-  return statusNames[status] || status
+  return variants[status] ?? 'default'
 }
 
-const getStatusVariant = (status: string) => {
-  const variants: Record<string, any> = {
-    'pending': 'secondary',
-    'in_progress': 'default',
-    'completed': 'success',
-    'cancelled': 'destructive'
+/**
+ * Formatea la categoría del costo
+ */
+const formatCostCategory = (category: string): string => {
+  const categories: Record<string, string> = {
+    materials: 'Materiales',
+    labor: 'Mano de Obra',
+    tools: 'Herramientas',
+    transport: 'Transporte',
+    other: 'Otros',
   }
-  return variants[status] || 'default'
+  return categories[category] || category
 }
 
-const formatCostCategory = (category: string) => {
-  const categoryNames: Record<string, string> = {
-    'materials': 'Materiales',
-    'labor': 'Mano de Obra',
-    'tools': 'Herramientas',
-    'transport': 'Transporte',
-    'other': 'Otros'
-  }
-  return categoryNames[category] || category
-}
-
-const formatDate = (date: string | null) => {
+/**
+ * Formatea fecha
+ */
+const formatDate = (date: string | null): string => {
   if (!date) return 'N/A'
-  return new Intl.DateTimeFormat('es-ES').format(new Date(date))
+  return new Date(date).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
-// Funciones de negocio
-const calculateTotalCosts = () => {
-  return costs.value.reduce((sum, cost) => sum + cost.amount, 0)
-}
-
-const startRepair = async () => {
+/**
+ * Inicia la reparación de la tarea
+ */
+const startRepair = async (): Promise<void> => {
   if (!repairerName.value.trim()) {
-    toast.error('Por favor ingrese el nombre del reparador')
+    toast.error('Ingrese el nombre del reparador')
     return
   }
-  
+
   try {
-    // Actualizar el estado de la tarea a "in_progress"
     await taskService.update({
-      id: taskId.value,
+      id: taskId,
       status: 'in_progress',
       repairer_name: repairerName.value,
-      start_date: new Date().toISOString()
+      start_date: new Date().toISOString(),
     })
-    
-    // Actualizar la tarea en la vista
+
     await loadTaskData()
-    
-    toast.success('Tarea iniciada exitosamente')
-  } catch (error) {
-    console.error('Error al iniciar la tarea:', error)
-    toast.error('Error al iniciar la tarea')
+    toast.success('Reparación iniciada exitosamente')
+  } catch (err: unknown) {
+    console.error(err)
+    toast.error('Error al iniciar la reparación')
   }
 }
 
-const completeTask = async () => {
-  // Aquí podría mostrar un modal para ingresar la solución
+/**
+ * Completa la tarea
+ */
+const completeTask = async (): Promise<void> => {
   try {
     await taskService.update({
-      id: taskId.value,
+      id: taskId,
       status: 'completed',
       completed_date: new Date().toISOString(),
-      solution: 'Reparación completada'
+      solution: 'Reparación completada',
     })
-    
-    // Actualizar la tarea en la vista
+
     await loadTaskData()
-    
     toast.success('Tarea completada exitosamente')
-  } catch (error) {
-    console.error('Error al completar la tarea:', error)
+  } catch (err: unknown) {
+    console.error(err)
     toast.error('Error al completar la tarea')
   }
 }
 
-const addComment = () => {
-  if (!newComment.value.trim()) {
-    toast.error('El comentario no puede estar vacío')
-    return
+/**
+ * Valida el formulario de costos
+ */
+const validateCostForm = (): boolean => {
+  costErrors.value = { amount: '', description: '' }
+  let isValid = true
+
+  if (!newCost.value.amount || newCost.value.amount <= 0) {
+    costErrors.value.amount = 'El importe debe ser mayor a 0'
+    isValid = false
   }
-  
-  // Aquí iría la lógica para guardar comentarios, que no está implementada completamente
-  // ya que la tabla comments no tiene CRUD completo en los servicios
-  console.log('Agregar comentario:', newComment.value)
-  toast.info('Funcionalidad de comentarios aún no implementada')
-  newComment.value = ''
+
+  if (!newCost.value.description.trim()) {
+    costErrors.value.description = 'La descripción es requerida'
+    isValid = false
+  }
+
+  return isValid
 }
 
-const saveCost = async () => {
-  // Validar los datos
-  if (!newCost.value.amount || newCost.value.amount <= 0) {
-    costError.value = 'El importe debe ser mayor a 0'
-    return
-  }
-  
+/**
+ * Guarda un nuevo costo
+ */
+const saveCost = async (): Promise<void> => {
+  if (!validateCostForm()) return
+
   try {
-    // Crear el nuevo costo
+    isSavingCost.value = true
     const createdCost = await costService.create({
       ...newCost.value,
-      task_id: taskId.value,
+      task_id: taskId,
       accommodation_id: task.value?.accommodation_id || '',
-      amount: newCost.value.amount,
-      category: newCost.value.category,
-      description: newCost.value.description
     })
-    
-    // Actualizar la lista de costos
+
     costs.value = [createdCost, ...costs.value]
-    
-    // Resetear el formulario
+
+    // Reset form
     newCost.value = {
-      task_id: taskId.value,
+      task_id: taskId,
       amount: 0,
       category: 'materials',
       description: '',
-      accommodation_id: task.value?.accommodation_id || ''
+      accommodation_id: task.value?.accommodation_id || '',
     }
-    
-    // Cerrar el diálogo
-    showCostForm.value = false
-    
+    costErrors.value = { amount: '', description: '' }
+
+    showCostDialog.value = false
     toast.success('Costo registrado exitosamente')
-  } catch (error) {
-    console.error('Error al guardar el costo:', error)
+  } catch (err: unknown) {
+    console.error(err)
     toast.error('Error al registrar el costo')
+  } finally {
+    isSavingCost.value = false
   }
 }
 
-const duplicateTask = () => {
-  console.log('Duplicar tarea')
-  // Aquí iría la lógica para duplicar la tarea
-  toast.info('Funcionalidad de duplicar tarea aún no implementada')
+/**
+ * Abre el dialog para agregar un costo
+ */
+const openCostDialog = (): void => {
+  newCost.value = {
+    task_id: taskId,
+    amount: 0,
+    category: 'materials',
+    description: '',
+    accommodation_id: task.value?.accommodation_id || '',
+  }
+  costErrors.value = { amount: '', description: '' }
+  showCostDialog.value = true
 }
 
-const goBack = () => {
+/**
+ * Navega de vuelta a la lista de tareas
+ */
+const goBack = (): void => {
   router.push('/tasks')
 }
 
@@ -290,342 +338,253 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="container mx-auto py-6">
-    <div v-if="loading" class="flex justify-center items-center h-64">
-      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+  <div class="container mx-auto py-8 space-y-6">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="space-y-6">
+      <Skeleton class="h-12 w-full" />
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+          <Skeleton class="h-64 w-full" />
+          <Skeleton class="h-64 w-full" />
+        </div>
+        <div class="space-y-6">
+          <Skeleton class="h-48 w-full" />
+        </div>
+      </div>
     </div>
-    <div v-else-if="!task" class="text-center py-12">
-      <h2 class="text-2xl font-bold text-foreground">Tarea no encontrada</h2>
+
+    <!-- Empty State -->
+    <div v-else-if="!task" class="flex flex-col items-center justify-center py-12">
+      <AlertCircle class="h-16 w-16 text-muted-foreground mb-4" />
+      <h2 class="text-2xl font-bold">Tarea no encontrada</h2>
       <Button class="mt-4" @click="goBack">Volver a tareas</Button>
     </div>
+
+    <!-- Content -->
     <div v-else class="space-y-6">
-      <div class="flex items-center mb-6">
-        <Button variant="outline" class="mr-4" @click="goBack">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-        </Button>
-        <h1 class="text-3xl font-bold text-foreground">Tarea #{{ task.id.substring(0, 8) }}</h1>
-        <div class="ml-auto">
-          <Badge :variant="getPriorityVariant(task.priority)" class="ml-4">
-            {{ getPriorityEmoji(task.priority) }} {{ formatPriority(task.priority) }}
+      <!-- Header -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <Button size="icon" variant="outline" @click="goBack">
+            <ArrowLeft class="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 class="text-3xl font-bold tracking-tight">
+              Tarea #{{ task.id.substring(0, 8) }}
+            </h1>
+            <p class="text-muted-foreground mt-1">
+              {{ task.accommodation?.code }} - {{ task.accommodation?.name }}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Badge :variant="getPriorityVariant(task.priority)">
+            {{ formatPriority(task.priority) }}
           </Badge>
-          <Badge :variant="getStatusVariant(task.status)" class="ml-2">
+          <Badge :variant="getStatusVariant(task.status)">
             {{ formatStatus(task.status) }}
           </Badge>
         </div>
       </div>
-      
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
           <!-- Información General -->
           <Card>
             <CardHeader>
               <CardTitle>Información General</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent class="space-y-4">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Accommodation</Label>
-                  <p class="text-foreground">{{ task.accommodation?.code }} - {{ task.accommodation?.name }}</p>
+                <div class="space-y-1">
+                  <Label class="text-muted-foreground">Área</Label>
+                  <p class="font-medium">{{ formatAreaName(task.area) }}</p>
                 </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Área</Label>
-                  <p class="text-foreground">{{ formatAreaName(task.area) }}</p>
+                <div class="space-y-1">
+                  <Label class="text-muted-foreground">Elemento</Label>
+                  <p class="font-medium">{{ formatElementName(task.element) }}</p>
                 </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Elemento</Label>
-                  <p class="text-foreground">{{ formatElementName(task.element) }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Prioridad</Label>
-                  <div class="flex items-center">
-                    <span class="mr-2">{{ getPriorityEmoji(task.priority) }}</span>
-                    <span>{{ formatPriority(task.priority) }}</span>
-                  </div>
-                </div>
-                <div class="md:col-span-2">
-                  <Label class="text-sm font-medium text-muted-foreground">Descripción del problema</Label>
-                  <p class="text-foreground mt-1">{{ task.description }}</p>
-                </div>
+              </div>
+              <Separator />
+              <div class="space-y-1">
+                <Label class="text-muted-foreground">Descripción del Problema</Label>
+                <p class="text-sm">{{ task.description }}</p>
               </div>
             </CardContent>
           </Card>
-          
+
           <!-- Estado de Reparación -->
-          <Card v-if="task.status !== 'completed'">
+          <Card>
             <CardHeader>
-              <CardTitle>Estado de Reparación</CardTitle>
+              <CardTitle class="flex items-center gap-2">
+                <Clock class="h-5 w-5" />
+                Estado de Reparación
+              </CardTitle>
             </CardHeader>
             <CardContent>
+              <!-- Pendiente -->
               <div v-if="task.status === 'pending'" class="space-y-4">
-                <div class="flex items-center space-x-4">
-                  <Badge variant="secondary">{{ formatStatus(task.status) }}</Badge>
-                  <Button @click="startRepair">Comenzar Reparación</Button>
+                <div class="space-y-2">
+                  <Label>Reparador</Label>
+                  <Input v-model="repairerName" placeholder="Nombre del reparador" />
                 </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Reparador</Label>
-                  <Input 
-                    v-model="repairerName" 
-                    placeholder="Nombre del reparador"
-                    class="mt-1"
-                  />
-                </div>
+                <Button @click="startRepair">Comenzar Reparación</Button>
               </div>
-              
+
+              <!-- En Progreso -->
               <div v-else-if="task.status === 'in_progress'" class="space-y-4">
-                <div class="flex items-center space-x-4">
-                  <Badge variant="default">{{ formatStatus(task.status) }}</Badge>
-                  <Button @click="completeTask">Completar Tarea</Button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="space-y-1">
+                    <Label class="text-muted-foreground">Reparador</Label>
+                    <p class="font-medium">{{ task.repairer_name || 'No asignado' }}</p>
+                  </div>
+                  <div class="space-y-1">
+                    <Label class="text-muted-foreground">Fecha de Inicio</Label>
+                    <p class="font-medium">{{ formatDate(task.start_date) }}</p>
+                  </div>
                 </div>
-                
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Reparador</Label>
-                  <p class="text-foreground">{{ task.repairer_name || 'No asignado' }}</p>
-                </div>
-                
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de inicio</Label>
-                  <p class="text-foreground">{{ formatDate(task.start_date) }}</p>
-                </div>
+                <Button @click="completeTask">
+                  <CheckCircle2 class="h-4 w-4 mr-2" />
+                  Completar Tarea
+                </Button>
               </div>
-              
+
+              <!-- Completada -->
               <div v-else-if="task.status === 'completed'" class="space-y-4">
-                <div class="flex items-center space-x-4">
-                  <Badge variant="success">{{ formatStatus(task.status) }}</Badge>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="space-y-1">
+                    <Label class="text-muted-foreground">Reparador</Label>
+                    <p class="font-medium">{{ task.repairer_name || 'No asignado' }}</p>
+                  </div>
+                  <div class="space-y-1">
+                    <Label class="text-muted-foreground">Fecha de Inicio</Label>
+                    <p class="font-medium">{{ formatDate(task.start_date) }}</p>
+                  </div>
+                  <div class="space-y-1">
+                    <Label class="text-muted-foreground">Fecha de Finalización</Label>
+                    <p class="font-medium">{{ formatDate(task.completed_date) }}</p>
+                  </div>
                 </div>
-                
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Reparador</Label>
-                  <p class="text-foreground">{{ task.repairer_name || 'No asignado' }}</p>
-                </div>
-                
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de inicio</Label>
-                  <p class="text-foreground">{{ formatDate(task.start_date) }}</p>
-                </div>
-                
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de finalización</Label>
-                  <p class="text-foreground">{{ formatDate(task.completed_date) }}</p>
-                </div>
-                
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Solución</Label>
-                  <p class="text-foreground">{{ task.solution }}</p>
+                <Separator />
+                <div class="space-y-1">
+                  <Label class="text-muted-foreground">Solución</Label>
+                  <p class="text-sm">{{ task.solution || 'Sin solución registrada' }}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          
+
           <!-- Costos -->
           <Card>
             <CardHeader class="flex flex-row items-center justify-between">
-              <CardTitle>Costos</CardTitle>
-              <Button size="sm" @click="showCostForm = true">Agregar Costo</Button>
+              <div>
+                <CardTitle class="flex items-center gap-2">
+                  <DollarSign class="h-5 w-5" />
+                  Costos
+                </CardTitle>
+                <CardDescription>Total: €{{ totalCost.toFixed(2) }}</CardDescription>
+              </div>
+              <Button size="sm" @click="openCostDialog">Agregar Costo</Button>
             </CardHeader>
             <CardContent>
-              <div v-if="costs && costs.length > 0">
+              <div v-if="costs.length > 0" class="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Categoría</TableHead>
                       <TableHead>Descripción</TableHead>
-                      <TableHead>Importe</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Acciones</TableHead>
+                      <TableHead class="text-right">Importe</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     <TableRow v-for="cost in costs" :key="cost.id">
                       <TableCell>{{ formatCostCategory(cost.category) }}</TableCell>
                       <TableCell>{{ cost.description }}</TableCell>
-                      <TableCell>€{{ cost.amount.toFixed(2) }}</TableCell>
-                      <TableCell>{{ formatDate(cost.expense_date) }}</TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm">Editar</Button>
+                      <TableCell class="text-right font-medium">
+                        €{{ cost.amount.toFixed(2) }}
                       </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
-                <div class="mt-4 text-right font-bold">
-                  Total: €{{ calculateTotalCosts().toFixed(2) }}
-                </div>
               </div>
-              <div v-else class="text-center py-4 text-muted-foreground">
+              <div v-else class="text-center py-8 text-muted-foreground">
                 No hay costos registrados
               </div>
             </CardContent>
           </Card>
-          
-          <!-- Galería de Fotos -->
-          <Card>
-            <CardHeader class="flex flex-row items-center justify-between">
-              <CardTitle>Galería de Fotos</CardTitle>
-              <Button size="sm">Subir Fotos</Button>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-6">
-                <!-- Fotos 'Before' -->
-                <div>
-                  <h4 class="font-medium mb-3">Antes</h4>
-                  <div class="grid grid-cols-3 gap-4">
-                    <div v-for="photo in beforePhotos" :key="photo.id" class="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <img :src="photo.url" :alt="photo.description" class="w-full h-full object-cover rounded-lg" />
-                    </div>
-                    <div v-if="beforePhotos.length === 0" class="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <span class="text-muted-foreground">Sin fotos</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Fotos 'During' -->
-                <div>
-                  <h4 class="font-medium mb-3">Durante</h4>
-                  <div class="grid grid-cols-3 gap-4">
-                    <div v-for="photo in duringPhotos" :key="photo.id" class="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <img :src="photo.url" :alt="photo.description" class="w-full h-full object-cover rounded-lg" />
-                    </div>
-                    <div v-if="duringPhotos.length === 0" class="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <span class="text-muted-foreground">Sin fotos</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Fotos 'After' -->
-                <div>
-                  <h4 class="font-medium mb-3">Después</h4>
-                  <div class="grid grid-cols-3 gap-4">
-                    <div v-for="photo in afterPhotos" :key="photo.id" class="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <img :src="photo.url" :alt="photo.description" class="w-full h-full object-cover rounded-lg" />
-                    </div>
-                    <div v-if="afterPhotos.length === 0" class="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                      <span class="text-muted-foreground">Sin fotos</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <!-- Comentarios -->
-          <Card>
-            <CardHeader class="flex flex-row items-center justify-between">
-              <CardTitle>Comentarios</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="space-y-4">
-                <div v-for="comment in task.comments" :key="comment.id" class="border-b pb-4 last:border-0 last:pb-0">
-                  <div class="flex justify-between">
-                    <span class="font-medium">{{ comment.author }}</span>
-                    <span class="text-sm text-muted-foreground">{{ formatDate(comment.date) }}</span>
-                  </div>
-                  <p class="mt-1">{{ comment.text }}</p>
-                </div>
-                
-                <div class="pt-4">
-                  <Textarea 
-                    v-model="newComment" 
-                    placeholder="Agregue un comentario..."
-                    class="mb-2"
-                  />
-                  <Button @click="addComment">Agregar Comentario</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
-        
+
+        <!-- Sidebar -->
         <div class="space-y-6">
           <!-- Detalles -->
           <Card>
             <CardHeader>
-              <CardTitle>Detalles</CardTitle>
+              <CardTitle class="flex items-center gap-2">
+                <Calendar class="h-5 w-5" />
+                Fechas
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div class="space-y-4">
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de Detección</Label>
-                  <p class="text-foreground">{{ formatDate(task.detection_date) }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de Vencimiento</Label>
-                  <p class="text-foreground">{{ formatDate(task.due_date) }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de Creación</Label>
-                  <p class="text-foreground">{{ formatDate(task.created_at) }}</p>
-                </div>
-                <div v-if="task.completed_date">
-                  <Label class="text-sm font-medium text-muted-foreground">Fecha de Finalización</Label>
-                  <p class="text-foreground">{{ formatDate(task.completed_date) }}</p>
-                </div>
-                <div>
-                  <Label class="text-sm font-medium text-muted-foreground">Etiquetas</Label>
-                  <div class="flex flex-wrap gap-2 mt-1">
-                    <Badge 
-                      v-for="tag in task.tags" 
-                      :key="tag.id" 
-                      variant="outline"
-                    >
-                      {{ tag.name }}
-                    </Badge>
-                    <span v-if="!task.tags || task.tags.length === 0" class="text-muted-foreground text-sm">Sin etiquetas</span>
-                  </div>
-                </div>
+            <CardContent class="space-y-4">
+              <div class="space-y-1">
+                <Label class="text-muted-foreground">Creación</Label>
+                <p class="text-sm font-medium">{{ formatDate(task.created_at) }}</p>
+              </div>
+              <div class="space-y-1">
+                <Label class="text-muted-foreground">Vencimiento</Label>
+                <p class="text-sm font-medium">{{ formatDate(task.due_date) }}</p>
+              </div>
+              <div v-if="task.start_date" class="space-y-1">
+                <Label class="text-muted-foreground">Inicio</Label>
+                <p class="text-sm font-medium">{{ formatDate(task.start_date) }}</p>
+              </div>
+              <div v-if="task.completed_date" class="space-y-1">
+                <Label class="text-muted-foreground">Finalización</Label>
+                <p class="text-sm font-medium">{{ formatDate(task.completed_date) }}</p>
               </div>
             </CardContent>
           </Card>
-          
+
           <!-- Acciones -->
           <Card>
             <CardHeader>
               <CardTitle>Acciones</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div class="space-y-3">
-                <Button class="w-full" @click="duplicateTask" variant="outline">
-                  Duplicar Tarea
-                </Button>
-                <Button class="w-full" variant="outline">
-                  Exportar a PDF
-                </Button>
-                <Button class="w-full" variant="destructive">
-                  Eliminar Tarea
-                </Button>
-              </div>
+            <CardContent class="space-y-2">
+              <Button class="w-full" variant="outline">Exportar a PDF</Button>
+              <Button class="w-full" variant="destructive">Eliminar Tarea</Button>
             </CardContent>
           </Card>
         </div>
       </div>
-      
-      <!-- Formulario para registrar costos -->
-      <Dialog v-model:open="showCostForm">
+
+      <!-- Dialog para Agregar Costo -->
+      <Dialog v-model:open="showCostDialog">
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar Costo</DialogTitle>
-            <DialogDescription>
-              Agregue un nuevo costo a esta tarea
-            </DialogDescription>
+            <DialogDescription>Agregue un nuevo costo a esta tarea</DialogDescription>
           </DialogHeader>
-          <div class="grid gap-4 py-4">
-            <div class="grid grid-cols-4 items-center gap-4">
-              <Label for="amount" class="text-right">Importe (€)</Label>
-              <Input 
-                id="amount" 
-                v-model="newCost.amount" 
-                type="number" 
-                step="0.01" 
-                class="col-span-3" 
-                :class="{ 'border-destructive': costError }"
+          <div class="space-y-4 py-4">
+            <div class="space-y-2">
+              <Label>Importe (€) *</Label>
+              <Input
+                v-model="newCost.amount"
+                :class="{ 'border-destructive': costErrors.amount }"
+                min="0"
+                placeholder="0.00"
+                step="0.01"
+                type="number"
               />
-              <div v-if="costError" class="col-span-4 text-sm text-destructive text-right"> {{ costError }}</div>
+              <p v-if="costErrors.amount" class="text-sm font-medium text-destructive">
+                {{ costErrors.amount }}
+              </p>
             </div>
-            
-            <div class="grid grid-cols-4 items-center gap-4">
-              <Label for="category" class="text-right">Categoría</Label>
+
+            <div class="space-y-2">
+              <Label>Categoría *</Label>
               <Select v-model="newCost.category">
-                <SelectTrigger class="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Seleccione una categoría" />
                 </SelectTrigger>
                 <SelectContent>
@@ -637,18 +596,25 @@ onMounted(async () => {
                 </SelectContent>
               </Select>
             </div>
-            
-            <div class="grid grid-cols-4 items-center gap-4">
-              <Label for="description" class="text-right">Descripción</Label>
-              <Textarea 
-                id="description" 
-                v-model="newCost.description" 
-                class="col-span-3" 
+
+            <div class="space-y-2">
+              <Label>Descripción *</Label>
+              <Textarea
+                v-model="newCost.description"
+                :class="{ 'border-destructive': costErrors.description }"
+                placeholder="Describe el costo..."
+                rows="3"
               />
+              <p v-if="costErrors.description" class="text-sm font-medium text-destructive">
+                {{ costErrors.description }}
+              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button @click="saveCost">Guardar Costo</Button>
+            <Button variant="outline" @click="showCostDialog = false">Cancelar</Button>
+            <Button :disabled="isSavingCost" @click="saveCost">
+              {{ isSavingCost ? 'Guardando...' : 'Guardar Costo' }}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
