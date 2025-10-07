@@ -138,11 +138,7 @@ export const accommodationService = {
   async getById(id: string): Promise<Accommodation | null> {
     validateId(id)
 
-    const { data, error } = await supabase
-      .from('accommodations')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const { data, error } = await supabase.from('accommodations').select('*').eq('id', id).single()
 
     if (error) {
       if (error.code === ERROR_CODE_NOT_FOUND) {
@@ -188,7 +184,7 @@ export const accommodationService = {
       name: accommodationData.name.trim(),
       address: accommodationData.address?.trim(),
       notes: accommodationData.notes?.trim(),
-      status: accommodationData.status || 'active' as AccommodationStatus,
+      status: accommodationData.status || ('active' as AccommodationStatus),
     }
 
     const { data, error } = await supabase
@@ -238,10 +234,7 @@ export const accommodationService = {
   async delete(id: string): Promise<void> {
     validateId(id)
 
-    const { error } = await supabase
-      .from('accommodations')
-      .delete()
-      .eq('id', id)
+    const { error } = await supabase.from('accommodations').delete().eq('id', id)
 
     if (error) {
       throw new Error(getErrorMessage(error, 'eliminar alojamiento'))
