@@ -115,6 +115,21 @@ const getCurrentTimestamp = (): string => {
   return new Date().toISOString()
 }
 
+/**
+ * Obtiene el ID del usuario autenticado
+ */
+const getCurrentUserId = async (): Promise<string> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Usuario no autenticado')
+  }
+
+  return user.id
+}
+
 export const accommodationService = {
   /**
    * Obtiene todos los alojamientos ordenados por fecha de creación
@@ -173,10 +188,13 @@ export const accommodationService = {
   },
 
   /**
-   * Crea un nuevo alojamiento con código en mayúsculas
+   * Crea un nuevo alojamiento con código en mayúsculas y usuario autenticado
    */
   async create(accommodationData: CreateAccommodationData): Promise<Accommodation> {
     validateCreateData(accommodationData)
+
+    // Obtener usuario autenticado
+    const userId = await getCurrentUserId()
 
     const dataToCreate = {
       ...accommodationData,
@@ -185,6 +203,7 @@ export const accommodationService = {
       address: accommodationData.address?.trim(),
       notes: accommodationData.notes?.trim(),
       status: accommodationData.status || ('active' as AccommodationStatus),
+      created_by: userId,
     }
 
     const { data, error } = await supabase
