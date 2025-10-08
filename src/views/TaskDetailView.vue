@@ -2,14 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import {
-  ArrowLeft,
-  Calendar,
-  DollarSign,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-} from 'lucide-vue-next'
+import { ArrowLeft, Calendar, DollarSign, AlertCircle, CheckCircle2, Clock } from 'lucide-vue-next'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -43,7 +36,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 
-import { taskService, type Task } from '@/composables/taskService'
+import { taskService, type TaskWithRelations } from '@/composables/taskService'
 import { costService, type CreateCostData, type Cost } from '@/composables/costService'
 
 const route = useRoute()
@@ -51,7 +44,7 @@ const router = useRouter()
 
 // Estado de datos
 const taskId = route.params.id as string
-const task = ref<Task | null>(null)
+const task = ref<TaskWithRelations | null>(null)
 const costs = ref<Cost[]>([])
 const isLoading = ref(true)
 
@@ -107,31 +100,6 @@ const loadTaskData = async (): Promise<void> => {
 const totalCost = computed(() => {
   return costs.value.reduce((sum, cost) => sum + cost.amount, 0)
 })
-
-/**
- * Formatea el nombre del área
- */
-const formatAreaName = (area: string): string => {
-  const areaNames: Record<string, string> = {
-    living_room: 'Sala de Estar',
-    kitchen: 'Cocina',
-    bathroom_1: 'Baño Principal',
-    bathroom_2: 'Segundo Baño',
-    bedroom_1: 'Dormitorio Principal',
-    bedroom_2: 'Segundo Dormitorio',
-    bedroom_3: 'Tercer Dormitorio',
-    terrace: 'Terraza',
-    garage: 'Garaje',
-  }
-  return areaNames[area] || area
-}
-
-/**
- * Formatea el nombre del elemento
- */
-const formatElementName = (element: string): string => {
-  return element.charAt(0).toUpperCase() + element.slice(1).replace(/_/g, ' ')
-}
 
 /**
  * Formatea la prioridad
@@ -200,7 +168,7 @@ const formatCostCategory = (category: string): string => {
 /**
  * Formatea fecha
  */
-const formatDate = (date: string | null): string => {
+const formatDate = (date: string | undefined): string => {
   if (!date) return 'N/A'
   return new Date(date).toLocaleDateString('es-ES', {
     day: '2-digit',
@@ -266,7 +234,7 @@ const validateCostForm = (): boolean => {
     isValid = false
   }
 
-  if (!newCost.value.description.trim()) {
+  if (!newCost.value.description?.trim()) {
     costErrors.value.description = 'La descripción es requerida'
     isValid = false
   }
@@ -369,9 +337,7 @@ onMounted(async () => {
             <ArrowLeft class="h-4 w-4" />
           </Button>
           <div>
-            <h1 class="text-3xl font-bold tracking-tight">
-              Tarea #{{ task.id.substring(0, 8) }}
-            </h1>
+            <h1 class="text-3xl font-bold tracking-tight">Tarea #{{ task.id.substring(0, 8) }}</h1>
             <p class="text-muted-foreground mt-1">
               {{ task.accommodation?.code }} - {{ task.accommodation?.name }}
             </p>
@@ -399,17 +365,21 @@ onMounted(async () => {
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="space-y-1">
                   <Label class="text-muted-foreground">Área</Label>
-                  <p class="font-medium">{{ formatAreaName(task.area) }}</p>
+                  <p class="font-medium">{{ task.area_label || 'N/A' }}</p>
                 </div>
                 <div class="space-y-1">
                   <Label class="text-muted-foreground">Elemento</Label>
-                  <p class="font-medium">{{ formatElementName(task.element) }}</p>
+                  <p class="font-medium">{{ task.element_name || 'N/A' }}</p>
                 </div>
               </div>
               <Separator />
               <div class="space-y-1">
                 <Label class="text-muted-foreground">Descripción del Problema</Label>
                 <p class="text-sm">{{ task.description }}</p>
+              </div>
+              <div v-if="task.notes" class="space-y-1">
+                <Label class="text-muted-foreground">Notas</Label>
+                <p class="text-sm">{{ task.notes }}</p>
               </div>
             </CardContent>
           </Card>
@@ -436,10 +406,6 @@ onMounted(async () => {
               <div v-else-if="task.status === 'in_progress'" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="space-y-1">
-                    <Label class="text-muted-foreground">Reparador</Label>
-                    <p class="font-medium">{{ task.repairer_name || 'No asignado' }}</p>
-                  </div>
-                  <div class="space-y-1">
                     <Label class="text-muted-foreground">Fecha de Inicio</Label>
                     <p class="font-medium">{{ formatDate(task.start_date) }}</p>
                   </div>
@@ -454,16 +420,16 @@ onMounted(async () => {
               <div v-else-if="task.status === 'completed'" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div class="space-y-1">
-                    <Label class="text-muted-foreground">Reparador</Label>
-                    <p class="font-medium">{{ task.repairer_name || 'No asignado' }}</p>
-                  </div>
-                  <div class="space-y-1">
                     <Label class="text-muted-foreground">Fecha de Inicio</Label>
                     <p class="font-medium">{{ formatDate(task.start_date) }}</p>
                   </div>
                   <div class="space-y-1">
                     <Label class="text-muted-foreground">Fecha de Finalización</Label>
                     <p class="font-medium">{{ formatDate(task.completed_date) }}</p>
+                  </div>
+                  <div v-if="task.time_spent_days" class="space-y-1">
+                    <Label class="text-muted-foreground">Días Transcurridos</Label>
+                    <p class="font-medium">{{ task.time_spent_days }} días</p>
                   </div>
                 </div>
                 <Separator />
@@ -531,6 +497,10 @@ onMounted(async () => {
                 <p class="text-sm font-medium">{{ formatDate(task.created_at) }}</p>
               </div>
               <div class="space-y-1">
+                <Label class="text-muted-foreground">Detección</Label>
+                <p class="text-sm font-medium">{{ formatDate(task.detection_date) }}</p>
+              </div>
+              <div class="space-y-1">
                 <Label class="text-muted-foreground">Vencimiento</Label>
                 <p class="text-sm font-medium">{{ formatDate(task.due_date) }}</p>
               </div>
@@ -569,7 +539,7 @@ onMounted(async () => {
             <div class="space-y-2">
               <Label>Importe (€) *</Label>
               <Input
-                v-model="newCost.amount"
+                v-model.number="newCost.amount"
                 :class="{ 'border-destructive': costErrors.amount }"
                 min="0"
                 placeholder="0.00"

@@ -1,4 +1,5 @@
 // src/composables/taskService.ts
+
 import { supabase } from '@/services/supabase'
 import type { AccommodationArea, AccommodationElement } from './accommodationAreaService'
 
@@ -9,7 +10,7 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 // Constantes
 const ERROR_CODE_NOT_FOUND = 'PGRST116'
 
-// Query con relaciones optimizadas
+// Query con relaciones optimizadas (YA normalizado)
 const TASK_SELECT_QUERY = `
   *,
   accommodation:accommodations(code, name),
@@ -49,7 +50,6 @@ const TASK_DETAIL_SELECT_QUERY = `
 export interface Task {
   id: string
   accommodation_id: string
-  accommodation_code: string
   accommodation_area_id: string
   accommodation_element_id: string
   description: string
@@ -61,7 +61,6 @@ export interface Task {
   start_date?: string
   completed_date?: string
   repairer_id?: string
-  repairer_name?: string
   solution?: string
   time_spent_days?: number
   notes?: string
@@ -108,56 +107,84 @@ export interface UpdateTaskData {
   assigned_to?: string
 }
 
+/**
+ * Valida que el ID de tarea sea válido
+ */
 const validateTaskId = (id: string): void => {
   if (!id || id.trim().length === 0) {
     throw new Error('El ID de tarea es requerido')
   }
 }
 
+/**
+ * Valida los datos de creación de tarea
+ */
 const validateCreateTaskData = (taskData: CreateTaskData): void => {
   if (!taskData.accommodation_id) {
     throw new Error('El ID del alojamiento es requerido')
   }
+
   if (!taskData.accommodation_area_id || taskData.accommodation_area_id.trim().length === 0) {
     throw new Error('El área es requerida')
   }
+
   if (!taskData.accommodation_element_id || taskData.accommodation_element_id.trim().length === 0) {
     throw new Error('El elemento es requerido')
   }
+
   if (!taskData.description || taskData.description.trim().length < 10) {
     throw new Error('La descripción debe tener al menos 10 caracteres')
   }
+
   if (!taskData.due_date) {
     throw new Error('La fecha de vencimiento es requerida')
   }
 }
 
+/**
+ * Valida los datos de actualización de tarea
+ */
 const validateUpdateTaskData = (taskData: UpdateTaskData): void => {
   if (!taskData.id || taskData.id.trim().length === 0) {
     throw new Error('El ID de tarea es requerido')
   }
 }
 
+/**
+ * Obtiene mensaje de error formateado
+ */
 const getErrorMessage = (error: Error, context: string): string => {
   const baseMessage = error.message || 'Error desconocido'
   return `Error al ${context}: ${baseMessage}`
 }
 
+/**
+ * Obtiene timestamp actual en formato ISO
+ */
 const getCurrentTimestamp = (): string => {
   return new Date().toISOString()
 }
 
+/**
+ * Extrae la etiqueta del área considerando room_number
+ */
 const extractAreaLabel = (task: Task): string => {
   if (!task.accommodation_area) return 'N/A'
+
   const customLabel = task.accommodation_area.custom_label
   const catalogLabel = task.accommodation_area.area_catalog?.label
   const roomNumber = task.accommodation_area.room_number
+
   const baseLabel = customLabel || catalogLabel || 'Área'
   return roomNumber ? `${baseLabel} ${roomNumber}` : baseLabel
 }
 
+/**
+ * Extrae el nombre del elemento
+ */
 const extractElementName = (task: Task): string => {
   if (!task.accommodation_element) return 'N/A'
+
   return (
     task.accommodation_element.custom_name ||
     task.accommodation_element.element_catalog?.name ||
@@ -165,6 +192,9 @@ const extractElementName = (task: Task): string => {
   )
 }
 
+/**
+ * Transforma task añadiendo etiquetas legibles
+ */
 const transformTaskWithLabels = (task: Task): TaskWithRelations => {
   return {
     ...task,
@@ -174,6 +204,9 @@ const transformTaskWithLabels = (task: Task): TaskWithRelations => {
 }
 
 export const taskService = {
+  /**
+   * Obtiene todas las tareas con relaciones
+   */
   async getAll(): Promise<TaskWithRelations[]> {
     const { data, error } = await supabase
       .from('tasks')
@@ -187,6 +220,9 @@ export const taskService = {
     return (data as Task[]).map(transformTaskWithLabels)
   },
 
+  /**
+   * Obtiene una tarea por ID con detalles completos
+   */
   async getById(id: string): Promise<TaskWithRelations | null> {
     validateTaskId(id)
 
@@ -206,8 +242,21 @@ export const taskService = {
     return transformTaskWithLabels(data as Task)
   },
 
+  /**
+   * Crea una nueva tarea
+   */
   async create(taskData: CreateTaskData): Promise<TaskWithRelations> {
     validateCreateTaskData(taskData)
+
+    // Obtener usuario autenticado
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      throw new Error('Usuario no autenticado. Por favor inicia sesión.')
+    }
 
     const taskToCreate = {
       accommodation_id: taskData.accommodation_id,
@@ -220,6 +269,7 @@ export const taskService = {
       estimated_cost: taskData.estimated_cost,
       assigned_to: taskData.assigned_to,
       detection_date: getCurrentTimestamp(),
+      created_by: user.id, // ✅ Usuario autenticado
     }
 
     const { data, error } = await supabase
@@ -235,6 +285,9 @@ export const taskService = {
     return transformTaskWithLabels(data as Task)
   },
 
+  /**
+   * Actualiza una tarea existente
+   */
   async update(taskData: UpdateTaskData): Promise<TaskWithRelations> {
     validateUpdateTaskData(taskData)
 
@@ -257,6 +310,9 @@ export const taskService = {
     return transformTaskWithLabels(data as Task)
   },
 
+  /**
+   * Elimina una tarea por ID
+   */
   async delete(id: string): Promise<void> {
     validateTaskId(id)
 
