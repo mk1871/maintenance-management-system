@@ -63,25 +63,45 @@ const router = createRouter({
   ],
 })
 
-// Navigation guard refactorizado para nueva API
+/**
+ * Navigation guard con manejo correcto de auth state
+ */
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Si la ruta no requiere auth, siempre permitir
+  // CORRECCIÓN 1: Si no requiere auth, permitir acceso directo
   if (!to.meta.requiresAuth) {
+    // Si está autenticado y va a login/register, redirigir a home
+    if (to.meta.hideForAuth && authStore.isAuthenticated) {
+      return next({ name: 'Home', replace: true })
+    }
     return next()
   }
 
-  // Verificar auth sólo una vez si no hay usuario
-  if (!authStore.supabaseUser && !authStore.isLoading) {
+  // CORRECCIÓN 2: Esperar a que termine de verificar auth si está cargando
+  if (authStore.isLoading) {
+    // Esperar máximo 3 segundos
+    let attempts = 0
+    while (authStore.isLoading && attempts < 30) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      attempts++
+    }
+  }
+
+  // CORRECCIÓN 3: Si no hay usuario después de cargar, verificar auth
+  if (!authStore.supabaseUser) {
     await authStore.checkAuth()
   }
 
+  // CORRECCIÓN 4: Decidir basado en estado final
   if (authStore.isAuthenticated) {
     next()
   } else {
-    // Reemplaza, evita historial de ruta protegida
-    next({ name: 'Login', replace: true, query: { redirect: to.fullPath } })
+    next({
+      name: 'Login',
+      replace: true,
+      query: { redirect: to.fullPath },
+    })
   }
 })
 
