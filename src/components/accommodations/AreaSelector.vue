@@ -1,7 +1,9 @@
 <script lang="ts" setup>
-import { ref, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { FormDescription } from '@/components/ui/form'
 import type { AreaCatalog } from '@/composables/areaCatalogService'
 
 // Props
@@ -15,7 +17,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: SelectedArea[]]
 }>()
 
-// Interface para áreas seleccionadas
+// Interface exportada
 export interface SelectedArea {
   area_catalog_id: string
   key: string
@@ -24,58 +26,89 @@ export interface SelectedArea {
   custom_label?: string
 }
 
+// State local
 const selectedAreas = ref<SelectedArea[]>([...props.modelValue])
-
-/**
- * Sincroniza cambios con el componente padre
- */
-watch(
-  selectedAreas,
-  (newValue) => {
-    emit('update:modelValue', newValue)
-  },
-  { deep: true }
-)
-
-/**
- * Verifica si un área está seleccionada
- */
-const isSelected = (areaCatalogId: string, roomNumber?: number): boolean => {
-  return selectedAreas.value.some(
-    (area) =>
-      area.area_catalog_id === areaCatalogId &&
-      (area.room_number === roomNumber || (!area.room_number && !roomNumber))
-  )
-}
 
 /**
  * Cuenta cuántas habitaciones están seleccionadas
  */
 const bedroomCount = computed((): number => {
-  return selectedAreas.value.filter((area) => area.key === 'bedroom').length
+  return countSelectedBedrooms()
 })
 
 /**
- * Obtiene el área de habitación del catálogo
+ * Obtiene el área de habitaciones del catálogo
  */
 const bedroomArea = computed((): AreaCatalog | undefined => {
-  return props.options.find((option) => option.key === 'bedroom')
+  return findBedroomInCatalog()
 })
 
 /**
- * Obtiene áreas que no son habitaciones para renderizado
+ * Obtiene áreas que no son habitaciones
  */
 const nonBedroomAreas = computed((): AreaCatalog[] => {
-  return props.options.filter((option) => option.key !== 'bedroom')
+  return filterNonBedroomAreas()
 })
 
 /**
- * Maneja el toggle de un área normal (no habitaciones)
+ * Verifica si un área está seleccionada
  */
-const handleToggle = (area: AreaCatalog, checked: boolean): void => {
-  if (area.key === 'bedroom') {
-    return
-  }
+const isAreaSelected = (areaCatalogId: string): boolean => {
+  return selectedAreas.value.some((area) => area.area_catalog_id === areaCatalogId)
+}
+
+/**
+ * Cuenta las habitaciones seleccionadas
+ */
+const countSelectedBedrooms = (): number => {
+  return selectedAreas.value.filter((area) => area.key === 'bedroom').length
+}
+
+/**
+ * Encuentra el área de habitaciones en el catálogo
+ */
+const findBedroomInCatalog = (): AreaCatalog | undefined => {
+  return props.options.find((option) => option.key === 'bedroom')
+}
+
+/**
+ * Filtra áreas que no son habitaciones
+ */
+const filterNonBedroomAreas = (): AreaCatalog[] => {
+  return props.options.filter((option) => option.key !== 'bedroom')
+}
+
+/**
+ * Agrega un área a la selección
+ */
+const addAreaToSelection = (area: AreaCatalog): void => {
+  if (isAreaSelected(area.id)) return
+
+  selectedAreas.value.push({
+    area_catalog_id: area.id,
+    key: area.key,
+    label: area.label,
+  })
+
+  emitUpdate()
+}
+
+/**
+ * Elimina un área de la selección
+ */
+const removeAreaFromSelection = (areaCatalogId: string): void => {
+  selectedAreas.value = selectedAreas.value.filter(
+    (selected) => selected.area_catalog_id !== areaCatalogId,
+  )
+
+  emitUpdate()
+}
+
+/**
+ * Maneja el cambio de estado del checkbox de área
+ */
+const handleAreaCheckboxChange = (area: AreaCatalog, checked: boolean): void => {
+  if (area.key === 'bedroom') return
 
   if (checked) {
     addAreaToSelection(area)
@@ -85,41 +118,15 @@ const handleToggle = (area: AreaCatalog, checked: boolean): void => {
 }
 
 /**
- * Agrega un área a la selección si no existe
+ * Handler específico para el evento update:checked del Checkbox
  */
-const addAreaToSelection = (area: AreaCatalog): void => {
-  if (!isSelected(area.id)) {
-    selectedAreas.value.push({
-      area_catalog_id: area.id,
-      key: area.key,
-      label: area.label,
-    })
+const onAreaCheckboxUpdate = (area: AreaCatalog) => {
+  return (checked: boolean | 'indeterminate'): void => {
+    // Ignorar estado indeterminate
+    if (checked === 'indeterminate') return
+
+    handleAreaCheckboxChange(area, checked)
   }
-}
-
-/**
- * Elimina un área de la selección
- */
-const removeAreaFromSelection = (areaCatalogId: string): void => {
-  selectedAreas.value = selectedAreas.value.filter(
-    (selected) => selected.area_catalog_id !== areaCatalogId
-  )
-}
-
-/**
- * Maneja el cambio en el número de habitaciones (0-4)
- */
-const handleBedroomChange = (area: AreaCatalog, count: number): void => {
-  const validCount = clampBedroomCount(count)
-  removeAllBedrooms()
-  addBedroomsToSelection(area, validCount)
-}
-
-/**
- * Limita el número de habitaciones entre 0 y 4
- */
-const clampBedroomCount = (count: number): number => {
-  return Math.max(0, Math.min(4, count))
 }
 
 /**
@@ -144,6 +151,28 @@ const addBedroomsToSelection = (area: AreaCatalog, count: number): void => {
 }
 
 /**
+ * Limita el número de habitaciones entre 0 y 4
+ */
+const clampBedroomCount = (count: number): number => {
+  const MIN_BEDROOMS = 0
+  const MAX_BEDROOMS = 4
+  return Math.max(MIN_BEDROOMS, Math.min(MAX_BEDROOMS, count))
+}
+
+/**
+ * Maneja el cambio en el número de habitaciones
+ */
+const handleBedroomCountChange = (count: number): void => {
+  if (!bedroomArea.value) return
+
+  const validCount = clampBedroomCount(count)
+
+  removeAllBedrooms()
+  addBedroomsToSelection(bedroomArea.value, validCount)
+  emitUpdate()
+}
+
+/**
  * Extrae el valor numérico del input de habitaciones
  */
 const extractBedroomCountFromInput = (event: Event): number => {
@@ -152,23 +181,18 @@ const extractBedroomCountFromInput = (event: Event): number => {
 }
 
 /**
- * Maneja el evento de cambio en el input de habitaciones
+ * Maneja el evento de input en el campo de habitaciones
  */
 const onBedroomInputChange = (event: Event): void => {
-  if (!bedroomArea.value) {
-    return
-  }
-
   const count = extractBedroomCountFromInput(event)
-  handleBedroomChange(bedroomArea.value, count)
+  handleBedroomCountChange(count)
 }
 
 /**
- * Maneja el evento de cambio en checkbox de área
+ * Emite el evento de actualización al padre
  */
-const onAreaCheckboxChange = (area: AreaCatalog, event: Event): void => {
-  const checkbox = event.target as HTMLInputElement
-  handleToggle(area, checkbox.checked)
+const emitUpdate = (): void => {
+  emit('update:modelValue', selectedAreas.value)
 }
 </script>
 
@@ -176,31 +200,26 @@ const onAreaCheckboxChange = (area: AreaCatalog, event: Event): void => {
   <div class="space-y-4">
     <div>
       <Label>Áreas del Alojamiento *</Label>
-      <p class="text-sm text-muted-foreground">
-        Selecciona las áreas que tiene este alojamiento
-      </p>
+      <FormDescription> Selecciona las áreas que tiene este alojamiento </FormDescription>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 border rounded-md p-4">
-      <!-- Áreas normales (excepto habitaciones) -->
-      <div
-        v-for="option in nonBedroomAreas"
-        :key="option.id"
-        class="flex items-center space-x-2"
-      >
-        <input
+      <!-- Áreas normales con Checkbox de shadcn-vue -->
+      <div v-for="option in nonBedroomAreas" :key="option.id" class="flex items-center space-x-2">
+        <Checkbox
           :id="`area-${option.key}`"
-          :checked="isSelected(option.id)"
-          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0 cursor-pointer"
-          type="checkbox"
-          @change="(event) => onAreaCheckboxChange(option, event)"
+          :checked="isAreaSelected(option.id)"
+          @update:checked="onAreaCheckboxUpdate(option)"
         />
-        <Label :for="`area-${option.key}`" class="cursor-pointer text-sm font-normal">
+        <Label
+          :for="`area-${option.key}`"
+          class="cursor-pointer text-sm font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+        >
           {{ option.label }}
         </Label>
       </div>
 
-      <!-- Habitaciones: campo numérico (0-4) -->
+      <!-- Habitaciones: Input numérico de shadcn-vue -->
       <div v-if="bedroomArea" class="col-span-full border-t pt-3 mt-2">
         <div class="flex items-center gap-4">
           <Label :for="`bedroom-count`" class="text-sm font-normal whitespace-nowrap">
@@ -208,7 +227,7 @@ const onAreaCheckboxChange = (area: AreaCatalog, event: Event): void => {
           </Label>
           <Input
             id="bedroom-count"
-            :value="bedroomCount"
+            :model-value="bedroomCount"
             class="w-20"
             max="4"
             min="0"
@@ -216,9 +235,11 @@ const onAreaCheckboxChange = (area: AreaCatalog, event: Event): void => {
             @input="onBedroomInputChange"
           />
         </div>
-        <p v-if="bedroomCount > 0" class="text-xs text-muted-foreground mt-2">
-          Se crearán: Habitación 1, Habitación 2, Habitación 3, Habitación 4 (según cantidad)
-        </p>
+        <FormDescription v-if="bedroomCount > 0" class="mt-2">
+          Se crearán: {{ bedroomCount }} habitación{{ bedroomCount !== 1 ? 'es' : '' }} numerada{{
+            bedroomCount !== 1 ? 's' : ''
+          }}
+        </FormDescription>
       </div>
     </div>
 
