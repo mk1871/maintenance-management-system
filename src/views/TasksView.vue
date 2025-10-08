@@ -1,462 +1,327 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Search, Filter, RefreshCw } from 'lucide-vue-next'
+import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import TaskList from '@/components/tasks/TaskList.vue'
+import TaskFilters from '@/components/tasks/TaskFilters.vue'
 import TaskForm from '@/components/tasks/TaskForm.vue'
 
-import { type Task, taskService } from '@/composables/taskService'
-import { type Accommodation, accommodationService } from '@/composables/accommodationService'
+import { taskService, type TaskWithRelations } from '@/composables/taskService'
 
+// Composables
 const router = useRouter()
 
-// Estado de datos
-const tasks = ref<Task[]>([])
-const accommodations = ref<Accommodation[]>([])
+// State
+const tasks = ref<TaskWithRelations[]>([])
 const isLoading = ref(true)
-const isRefreshing = ref(false)
+const taskToDelete = ref<TaskWithRelations | null>(null)
+const isDeleting = ref(false)
 
-// Estado de filtros
+// Filtros
 const searchQuery = ref('')
-const statusFilter = ref<string>('all')
-const priorityFilter = ref<string>('all')
-const accommodationFilter = ref<string>('all')
-
-// Paginación
-const currentPage = ref(1)
-const itemsPerPage = 10
+const statusFilter = ref('all')
+const priorityFilter = ref('all')
 
 /**
- * Carga inicial de datos desde la base de datos
+ * Estadísticas calculadas
  */
-const loadData = async (): Promise<void> => {
+const stats = computed(() => {
+  return calculateTaskStats()
+})
+
+/**
+ * Tareas filtradas
+ */
+const filteredTasks = computed((): TaskWithRelations[] => {
+  return applyFilters()
+})
+
+/**
+ * Carga todas las tareas
+ */
+const loadTasks = async (): Promise<void> => {
+  isLoading.value = true
   try {
-    isLoading.value = true
-    const [tasksData, accommodationsData] = await Promise.all([
-      taskService.getAll(),
-      accommodationService.getAll(),
-    ])
-    tasks.value = tasksData
-    accommodations.value = accommodationsData
-  } catch (err: unknown) {
-    console.error(err)
-    toast.error('Error al cargar las tareas')
+    tasks.value = await taskService.getAll()
+  } catch (error: unknown) {
+    console.error(error)
+    toast.error('Error al cargar tareas')
   } finally {
     isLoading.value = false
   }
 }
 
 /**
- * Refresca los datos desde la base de datos
+ * Calcula estadísticas de tareas
  */
-const handleRefresh = async (): Promise<void> => {
-  isRefreshing.value = true
-  await loadData()
-  isRefreshing.value = false
-  toast.success('Tareas actualizadas')
+const calculateTaskStats = () => {
+  const total = tasks.value.length
+  const pending = tasks.value.filter((t) => t.status === 'pending').length
+  const inProgress = tasks.value.filter((t) => t.status === 'in_progress').length
+  const completed = tasks.value.filter((t) => t.status === 'completed').length
+  const overdue = tasks.value.filter((t) => isTaskOverdue(t)).length
+
+  return { total, pending, inProgress, completed, overdue }
 }
 
 /**
- * Limpia todos los filtros aplicados
+ * Verifica si una tarea está vencida
  */
-const clearFilters = (): void => {
-  searchQuery.value = ''
-  statusFilter.value = 'all'
-  priorityFilter.value = 'all'
-  accommodationFilter.value = 'all'
-  currentPage.value = 1
+const isTaskOverdue = (task: TaskWithRelations): boolean => {
+  if (task.status === 'completed' || task.status === 'cancelled') {
+    return false
+  }
+  return new Date(task.due_date) < new Date()
 }
 
 /**
- * Filtra tareas según criterios seleccionados
+ * Aplica filtros a las tareas
  */
-const filteredTasks = computed(() => {
-  let result = [...tasks.value]
+const applyFilters = (): TaskWithRelations[] => {
+  let filtered = [...tasks.value]
 
-  // Filtro por búsqueda
-  if (searchQuery.value) {
+  // Filtro de búsqueda
+  if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter(
-      (task) =>
-        task.description.toLowerCase().includes(query) ||
-        task.accommodation?.code.toLowerCase().includes(query) ||
-        task.accommodation?.name.toLowerCase().includes(query),
+    filtered = filtered.filter((task) =>
+      matchesSearchQuery(task, query)
     )
   }
 
-  // Filtro por estado
+  // Filtro de estado
   if (statusFilter.value !== 'all') {
-    result = result.filter((task) => task.status === statusFilter.value)
+    filtered = filtered.filter((task) => task.status === statusFilter.value)
   }
 
-  // Filtro por prioridad
+  // Filtro de prioridad
   if (priorityFilter.value !== 'all') {
-    result = result.filter((task) => task.priority === priorityFilter.value)
+    filtered = filtered.filter((task) => task.priority === priorityFilter.value)
   }
 
-  // Filtro por alojamiento
-  if (accommodationFilter.value !== 'all') {
-    result = result.filter((task) => task.accommodation_id === accommodationFilter.value)
-  }
-
-  return result
-})
+  return filtered
+}
 
 /**
- * Tareas paginadas según página actual
+ * Verifica si una tarea coincide con la búsqueda
  */
-const paginatedTasks = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage
-  const end = start + itemsPerPage
-  return filteredTasks.value.slice(start, end)
-})
+const matchesSearchQuery = (task: TaskWithRelations, query: string): boolean => {
+  const searchableFields = [
+    task.description.toLowerCase(),
+    task.accommodation?.code.toLowerCase() || '',
+    task.area_label?.toLowerCase() || '',
+    task.element_name?.toLowerCase() || '',
+  ]
+
+  return searchableFields.some((field) => field.includes(query))
+}
 
 /**
- * Calcula total de páginas disponibles
+ * Maneja actualización de filtro de búsqueda
  */
-const totalPages = computed(() => Math.ceil(filteredTasks.value.length / itemsPerPage))
+const handleSearchUpdate = (value: string): void => {
+  searchQuery.value = value
+}
 
 /**
- * Navega a una página específica
+ * Maneja actualización de filtro de estado
  */
-const goToPage = (page: number): void => {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
+const handleStatusUpdate = (value: string): void => {
+  statusFilter.value = value
+}
+
+/**
+ * Maneja actualización de filtro de prioridad
+ */
+const handlePriorityUpdate = (value: string): void => {
+  priorityFilter.value = value
+}
+
+/**
+ * Limpia todos los filtros
+ */
+const handleClearFilters = (): void => {
+  searchQuery.value = ''
+  statusFilter.value = 'all'
+  priorityFilter.value = 'all'
+}
+
+/**
+ * Navega al detalle de una tarea
+ */
+const handleViewDetail = (taskId: string): void => {
+  router.push({ name: 'TaskDetail', params: { id: taskId } })
+}
+
+/**
+ * Marca una tarea como completada
+ */
+const handleCompleteTask = async (taskId: string): Promise<void> => {
+  try {
+    await taskService.update({
+      id: taskId,
+      status: 'completed',
+      completed_date: new Date().toISOString(),
+    })
+
+    toast.success('Tarea marcada como completada')
+    await loadTasks()
+  } catch (error: unknown) {
+    console.error(error)
+    toast.error('Error al completar tarea')
   }
 }
 
 /**
- * Formatea el nombre del área desde la base de datos
+ * Abre el dialog de confirmación de eliminación
  */
-const formatAreaName = (area: string): string => {
-  const areaNames: Record<string, string> = {
-    living_room: 'Sala',
-    kitchen: 'Cocina',
-    bathroom_1: 'Baño 1',
-    bathroom_2: 'Baño 2',
-    bedroom_1: 'Habitación 1',
-    bedroom_2: 'Habitación 2',
-    bedroom_3: 'Habitación 3',
-    terrace: 'Terraza',
-    garage: 'Garaje',
+const openDeleteDialog = (taskId: string): void => {
+  const task = tasks.value.find((t) => t.id === taskId)
+  if (task) {
+    taskToDelete.value = task
   }
-  return areaNames[area] || area
 }
 
 /**
- * Formatea el nombre del elemento
+ * Cierra el dialog de eliminación
  */
-const formatElementName = (element: string): string => {
-  return element.charAt(0).toUpperCase() + element.slice(1).replace(/_/g, ' ')
+const closeDeleteDialog = (): void => {
+  taskToDelete.value = null
 }
 
 /**
- * Formatea la prioridad para mostrar
+ * Elimina una tarea después de confirmación
  */
-const formatPriority = (priority: string): string => {
-  const priorities: Record<string, string> = {
-    low: 'Baja',
-    medium: 'Media',
-    high: 'Alta',
+const handleDeleteTask = async (): Promise<void> => {
+  if (!taskToDelete.value) return
+
+  isDeleting.value = true
+  try {
+    await taskService.delete(taskToDelete.value.id)
+    toast.success('Tarea eliminada exitosamente')
+    closeDeleteDialog()
+    await loadTasks()
+  } catch (error: unknown) {
+    console.error(error)
+    toast.error('Error al eliminar tarea')
+  } finally {
+    isDeleting.value = false
   }
-  return priorities[priority] || priority
-}
-
-/**
- * Retorna la variante de badge según prioridad
- */
-const getPriorityVariant = (priority: string): 'default' | 'destructive' | 'secondary' => {
-  const variants: Record<string, 'default' | 'destructive' | 'secondary'> = {
-    low: 'secondary',
-    medium: 'default',
-    high: 'destructive',
-  }
-  return variants[priority] ?? 'default'
-}
-
-/**
- * Formatea el estado para mostrar
- */
-const formatStatus = (status: string): string => {
-  const statuses: Record<string, string> = {
-    pending: 'Pendiente',
-    in_progress: 'En Progreso',
-    completed: 'Completada',
-    cancelled: 'Cancelada',
-  }
-  return statuses[status] || status
-}
-
-/**
- * Retorna la variante de badge según estado
- */
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'outline' => {
-  const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
-    pending: 'outline',
-    in_progress: 'default',
-    completed: 'secondary',
-    cancelled: 'outline',
-  }
-  return variants[status] ?? 'default'
-}
-
-/**
- * Formatea fecha en formato español
- */
-const formatDate = (date: string): string => {
-  return new Date(date).toLocaleDateString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-/**
- * Navega al detalle de la tarea
- */
-const viewTaskDetail = (taskId: string): void => {
-  router.push(`/tasks/${taskId}`)
 }
 
 /**
  * Maneja la creación exitosa de una tarea
  */
 const handleTaskCreated = (): void => {
-  handleRefresh()
+  loadTasks()
 }
 
+// Lifecycle
 onMounted(async () => {
-  await loadData()
+  await loadTasks()
 })
 </script>
 
 <template>
-  <div class="container mx-auto py-8 space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
+  <div class="space-y-6">
+    <!-- Header con Estadísticas -->
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight">Tareas de Mantenimiento</h1>
-        <p class="text-muted-foreground mt-1">
+        <h1 class="text-3xl font-bold">Tareas</h1>
+        <p class="text-muted-foreground">
           Gestiona y monitorea todas las tareas de mantenimiento
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <Button :disabled="isRefreshing" size="icon" variant="outline" @click="handleRefresh">
-          <RefreshCw :class="{ 'animate-spin': isRefreshing }" class="h-4 w-4" />
-        </Button>
-        <TaskForm @task-created="handleTaskCreated" />
+
+      <!-- Estadísticas Compactas -->
+      <div class="flex gap-4">
+        <div class="border rounded-lg p-3 bg-card">
+          <div class="flex items-center gap-2">
+            <div class="text-2xl font-bold">{{ stats.total }}</div>
+            <div class="text-sm text-muted-foreground">Total</div>
+          </div>
+        </div>
+        <div class="border rounded-lg p-3 bg-card">
+          <div class="flex items-center gap-2">
+            <div class="text-2xl font-bold text-blue-600">{{ stats.pending }}</div>
+            <div class="text-sm text-muted-foreground">Pendientes</div>
+          </div>
+        </div>
+        <div class="border rounded-lg p-3 bg-card">
+          <div class="flex items-center gap-2">
+            <div class="text-2xl font-bold text-green-600">{{ stats.completed }}</div>
+            <div class="text-sm text-muted-foreground">Completadas</div>
+          </div>
+        </div>
+        <div v-if="stats.overdue > 0" class="border rounded-lg p-3 bg-card border-destructive">
+          <div class="flex items-center gap-2">
+            <div class="text-2xl font-bold text-destructive">{{ stats.overdue }}</div>
+            <div class="text-sm text-muted-foreground">Vencidas</div>
+          </div>
+        </div>
       </div>
     </div>
 
+    <Separator />
+
+    <!-- Toolbar con Filtros y Botón de Crear -->
+    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <h2 class="text-xl font-semibold">Lista de Tareas</h2>
+      <TaskForm @task-created="handleTaskCreated" />
+    </div>
+
     <!-- Filtros -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center gap-2">
-          <Filter class="h-5 w-5" />
-          Filtros
-        </CardTitle>
-        <CardDescription>Filtra las tareas según tus criterios</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <!-- Búsqueda -->
-          <div class="relative">
-            <Search class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input v-model="searchQuery" class="pl-9" placeholder="Buscar tareas..." />
-          </div>
+    <TaskFilters
+      @clear="handleClearFilters"
+      @update:search="handleSearchUpdate"
+      @update:status="handleStatusUpdate"
+      @update:priority="handlePriorityUpdate"
+    />
 
-          <!-- Filtro por Estado -->
-          <Select v-model="statusFilter">
-            <SelectTrigger>
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="pending">Pendiente</SelectItem>
-              <SelectItem value="in_progress">En Progreso</SelectItem>
-              <SelectItem value="completed">Completada</SelectItem>
-              <SelectItem value="cancelled">Cancelada</SelectItem>
-            </SelectContent>
-          </Select>
+    <!-- Lista de Tareas -->
+    <TaskList
+      :is-loading="isLoading"
+      :tasks="filteredTasks"
+      @complete="handleCompleteTask"
+      @delete="openDeleteDialog"
+      @view-detail="handleViewDetail"
+    />
 
-          <!-- Filtro por Prioridad -->
-          <Select v-model="priorityFilter">
-            <SelectTrigger>
-              <SelectValue placeholder="Prioridad" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las prioridades</SelectItem>
-              <SelectItem value="low">Baja</SelectItem>
-              <SelectItem value="medium">Media</SelectItem>
-              <SelectItem value="high">Alta</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <!-- Filtro por Alojamiento -->
-          <Select v-model="accommodationFilter">
-            <SelectTrigger>
-              <SelectValue placeholder="Alojamiento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los alojamientos</SelectItem>
-              <SelectItem v-for="acc in accommodations" :key="acc.id" :value="acc.id">
-                {{ acc.code }} - {{ acc.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <!-- Botón limpiar filtros -->
-        <div class="mt-4 flex justify-end">
-          <Button size="sm" variant="ghost" @click="clearFilters"> Limpiar filtros </Button>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- Tabla de Tareas -->
-    <Card>
-      <CardHeader>
-        <div class="flex items-center justify-between">
-          <div>
-            <CardTitle>Lista de Tareas</CardTitle>
-            <CardDescription> {{ filteredTasks.length }} tarea(s) encontrada(s) </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <!-- Loading State -->
-        <div v-if="isLoading" class="space-y-3">
-          <Skeleton v-for="i in 5" :key="i" class="h-16 w-full" />
-        </div>
-
-        <!-- Empty State -->
-        <div
-          v-else-if="filteredTasks.length === 0"
-          class="flex flex-col items-center justify-center py-12 text-center"
-        >
-          <div class="text-6xl mb-4">📋</div>
-          <h3 class="text-lg font-semibold">No hay tareas</h3>
-          <p class="text-muted-foreground mt-1">
-            {{
-              tasks.length === 0
-                ? 'Crea tu primera tarea para comenzar'
-                : 'No se encontraron tareas con los filtros aplicados'
-            }}
-          </p>
-          <Button v-if="tasks.length > 0" class="mt-4" variant="outline" @click="clearFilters">
-            Limpiar filtros
-          </Button>
-        </div>
-
-        <!-- Tabla -->
-        <div v-else class="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Alojamiento</TableHead>
-                <TableHead>Área / Elemento</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Vencimiento</TableHead>
-                <TableHead class="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow
-                v-for="task in paginatedTasks"
-                :key="task.id"
-                class="hover:bg-muted/50 cursor-pointer"
-                @click="viewTaskDetail(task.id)"
-              >
-                <TableCell class="font-medium">
-                  <div class="flex flex-col">
-                    <span class="font-semibold">{{ task.accommodation?.code }}</span>
-                    <span class="text-xs text-muted-foreground">{{
-                        task.accommodation?.name
-                      }}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div class="flex flex-col">
-                    <span class="text-sm">{{ formatAreaName(task.area) }}</span>
-                    <span class="text-xs text-muted-foreground">{{
-                        formatElementName(task.element)
-                      }}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div :title="task.description" class="max-w-xs truncate">
-                    {{ task.description }}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getPriorityVariant(task.priority)">
-                    {{ formatPriority(task.priority) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getStatusVariant(task.status)">
-                    {{ formatStatus(task.status) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {{ formatDate(task.due_date) }}
-                </TableCell>
-                <TableCell class="text-right">
-                  <Button size="sm" variant="ghost" @click.stop="viewTaskDetail(task.id)">
-                    Ver detalle
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-
-        <!-- Paginación -->
-        <div v-if="totalPages > 1" class="flex items-center justify-between mt-4">
-          <p class="text-sm text-muted-foreground">Página {{ currentPage }} de {{ totalPages }}</p>
-          <div class="flex gap-2">
-            <Button
-              :disabled="currentPage === 1"
-              size="sm"
-              variant="outline"
-              @click="goToPage(currentPage - 1)"
-            >
-              Anterior
-            </Button>
-            <Button
-              :disabled="currentPage === totalPages"
-              size="sm"
-              variant="outline"
-              @click="goToPage(currentPage + 1)"
-            >
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <!-- Delete Confirmation Dialog -->
+    <AlertDialog :open="!!taskToDelete" @update:open="closeDeleteDialog">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción eliminará permanentemente la tarea y no se puede deshacer.
+            <br /><br />
+            <strong>Descripción:</strong> {{ taskToDelete?.description.substring(0, 100) }}...
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="closeDeleteDialog">
+            Cancelar
+          </AlertDialogCancel>
+          <AlertDialogAction
+            :disabled="isDeleting"
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            @click="handleDeleteTask"
+          >
+            {{ isDeleting ? 'Eliminando...' : 'Eliminar' }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>

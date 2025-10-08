@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
-import { z } from 'zod'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,17 +11,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -30,196 +20,204 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
 
 import AreaSelector, { type SelectedArea } from './AreaSelector.vue'
 import AreaElementsConfig, { type SelectedElement } from './AreaElementsConfig.vue'
 
-import { useFormValidation } from '@/composables/useFormValidation'
 import { useAccommodationForm } from '@/composables/useAccommodationForm'
 import { accommodationService } from '@/composables/accommodationService'
 import { useAreaCatalogService } from '@/composables/areaCatalogService'
 import type { AreaCatalog, ElementCatalog } from '@/composables/areaCatalogService'
 
-// Emits
 const emit = defineEmits<{
   (e: 'accommodation-created'): void
 }>()
 
-// Zod Schema
-const accommodationFormSchema = z.object({
-  code: z
-    .string()
-    .min(1, 'Código requerido')
-    .max(20, 'Máximo 20 caracteres')
-    .regex(/^[A-Z0-9-]+$/, 'Solo mayúsculas, números y guiones'),
-  name: z.string().min(3, 'Mínimo 3 caracteres').max(100, 'Máximo 100 caracteres'),
-  address: z.string().optional(),
-  status: z.enum(['active', 'inactive']),
-  notes: z.string().optional(),
-})
+interface FormData {
+  code: string
+  name: string
+  address: string
+  status: 'active' | 'inactive'
+  notes: string
+}
 
-type AccommodationFormValues = z.infer<typeof accommodationFormSchema>
+interface FormErrors {
+  code: string
+  name: string
+}
 
-// Composables
+const MIN_CODE_LENGTH = 1
+const MAX_CODE_LENGTH = 4
+const MIN_NAME_LENGTH = 3
+const CODE_PATTERN = /^[A-Z0-9]+$/
+
 const { getAreasWithElements } = useAreaCatalogService()
 const { saveAreasAndElements, handleApiError } = useAccommodationForm()
-const form = useFormValidation(accommodationFormSchema, {
-  status: 'active' as const,
+
+const formData = ref<FormData>({
+  code: '',
+  name: '',
+  address: '',
+  status: 'active',
+  notes: '',
 })
 
-// State
+const errors = ref<FormErrors>({
+  code: '',
+  name: '',
+})
+
 const areaCatalog = ref<AreaCatalog[]>([])
 const selectedAreas = ref<SelectedArea[]>([])
 const selectedElements = ref<SelectedElement[]>([])
 const isDialogOpen = ref(false)
 const isSubmitting = ref(false)
 
-/**
- * Organiza elementos del catálogo por área en un Map
- */
 const elementCatalogMap = computed((): Map<string, ElementCatalog[]> => {
-  return buildElementCatalogMap()
+  const map = new Map<string, ElementCatalog[]>()
+  areaCatalog.value.forEach((area) => {
+    if ('elements' in area && Array.isArray(area.elements)) {
+      map.set(area.id, area.elements as ElementCatalog[])
+    }
+  })
+  return map
 })
 
-/**
- * Valida si el formulario está completo
- */
+// ✅ FIX: Validar que CADA área tenga al menos 1 elemento
+const areasWithoutElements = computed(() => {
+  return selectedAreas.value.filter((area) => {
+    return !selectedElements.value.some(
+      (el) =>
+        el.area_catalog_id === area.area_catalog_id &&
+        (el.room_number === area.room_number || (!el.room_number && !area.room_number)),
+    )
+  })
+})
+
 const isFormValid = computed((): boolean => {
-  return validateFormCompletion()
+  return (
+    !errors.value.code &&
+    !errors.value.name &&
+    formData.value.code.length >= MIN_CODE_LENGTH &&
+    formData.value.name.length >= MIN_NAME_LENGTH &&
+    selectedAreas.value.length > 0 &&
+    areasWithoutElements.value.length === 0
+  )
 })
 
-/**
- * Carga el catálogo maestro de áreas con elementos
- */
+const validateCode = (): void => {
+  const code = formData.value.code.trim()
+
+  if (!code) {
+    errors.value.code = 'El código es requerido'
+    return
+  }
+
+  if (code.length < MIN_CODE_LENGTH || code.length > MAX_CODE_LENGTH) {
+    errors.value.code = `El código debe tener entre ${MIN_CODE_LENGTH} y ${MAX_CODE_LENGTH} caracteres`
+    return
+  }
+
+  if (!CODE_PATTERN.test(code)) {
+    errors.value.code = 'Solo mayúsculas y números'
+    return
+  }
+
+  errors.value.code = ''
+}
+
+const validateName = (): void => {
+  const name = formData.value.name.trim()
+
+  if (!name) {
+    errors.value.name = 'El nombre es requerido'
+    return
+  }
+
+  if (name.length < MIN_NAME_LENGTH) {
+    errors.value.name = `El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`
+    return
+  }
+
+  errors.value.name = ''
+}
+
 const loadAreaCatalog = async (): Promise<void> => {
   try {
-    const areasWithElements = await getAreasWithElements()
-    areaCatalog.value = areasWithElements as AreaCatalog[]
+    const data = await getAreasWithElements()
+    areaCatalog.value = data as AreaCatalog[]
   } catch (error: unknown) {
     handleApiError(error, 'cargar catálogo de áreas')
   }
 }
 
-/**
- * Construye un Map de elementos organizados por área
- */
-const buildElementCatalogMap = (): Map<string, ElementCatalog[]> => {
-  const map = new Map<string, ElementCatalog[]>()
-
-  areaCatalog.value.forEach((area) => {
-    // CORRECCIÓN: Type guard para 'elements'
-    if ('elements' in area && Array.isArray(area.elements)) {
-      map.set(area.id, area.elements as ElementCatalog[])
-    }
-  })
-
-  return map
-}
-
-/**
- * Valida que el formulario esté completo para habilitar submit
- */
-const validateFormCompletion = (): boolean => {
-  const hasBasicFields = Boolean(form.values.code && form.values.name)
-  const hasAreas = selectedAreas.value.length > 0
-  const hasElements = selectedElements.value.length > 0
-
-  return hasBasicFields && hasAreas && hasElements
-}
-
-/**
- * Normaliza el código del alojamiento (uppercase, trim)
- */
-const normalizeAccommodationCode = (code: string): string => {
-  return code.trim().toUpperCase()
-}
-
-/**
- * Construye el JSONB de configured_areas para compatibilidad legacy
- */
-const buildConfiguredAreasJsonb = (): Record<string, string[]> => {
-  const configuredAreas: Record<string, string[]> = {}
-
+const buildConfiguredAreas = (): Record<string, string[]> => {
+  const config: Record<string, string[]> = {}
   selectedAreas.value.forEach((area) => {
-    const areaKey = buildAreaKey(area)
-
-    configuredAreas[areaKey] = getElementNamesForArea(area)
+    const key = area.room_number ? `${area.key}_${area.room_number}` : area.key
+    config[key] = selectedElements.value
+      .filter(
+        (el) =>
+          el.area_catalog_id === area.area_catalog_id &&
+          (el.room_number === area.room_number || (!el.room_number && !area.room_number)),
+      )
+      .map((el) => el.element_name)
   })
-
-  return configuredAreas
+  return config
 }
 
-/**
- * Construye la clave del área para el JSONB
- */
-const buildAreaKey = (area: SelectedArea): string => {
-  return area.room_number ? `${area.key}_${area.room_number}` : area.key
-}
-
-/**
- * Obtiene los nombres de elementos para un área específica
- */
-const getElementNamesForArea = (area: SelectedArea): string[] => {
-  return selectedElements.value
-    .filter((element) => isElementFromArea(element, area))
-    .map((element) => element.element_name)
-}
-
-/**
- * Verifica si un elemento pertenece a un área específica
- */
-const isElementFromArea = (element: SelectedElement, area: SelectedArea): boolean => {
-  const matchesArea = element.area_catalog_id === area.area_catalog_id
-  const matchesRoomNumber =
-    element.room_number === area.room_number || (!element.room_number && !area.room_number)
-
-  return matchesArea && matchesRoomNumber
-}
-
-/**
- * Crea el alojamiento en la base de datos
- */
-const createAccommodationInDatabase = async (values: AccommodationFormValues): Promise<string> => {
-  const accommodationData = {
-    code: normalizeAccommodationCode(values.code),
-    name: values.name.trim(),
-    address: values.address?.trim(),
-    status: values.status,
-    notes: values.notes?.trim(),
-    configured_areas: buildConfiguredAreasJsonb(), // CORRECCIÓN: Campo requerido
+const resetForm = (): void => {
+  formData.value = {
+    code: '',
+    name: '',
+    address: '',
+    status: 'active',
+    notes: '',
   }
-
-  const created = await accommodationService.create(accommodationData)
-  return created.id
-}
-
-/**
- * Resetea el formulario a su estado inicial
- */
-const resetFormState = (): void => {
-  form.resetForm()
   selectedAreas.value = []
   selectedElements.value = []
+  errors.value.code = ''
+  errors.value.name = ''
 }
 
-/**
- * Maneja el submit del formulario
- */
-const handleFormSubmit = async (values: Record<string, unknown>): Promise<void> => {
-  // CORRECCIÓN: Type assertion segura
-  const formValues = values as AccommodationFormValues
+const handleCreate = async (): Promise<void> => {
+  validateCode()
+  validateName()
+
+  if (!isFormValid.value) {
+    if (selectedAreas.value.length === 0) {
+      toast.error('Debes seleccionar al menos un área')
+    } else if (areasWithoutElements.value.length > 0) {
+      toast.error(
+        `Las siguientes áreas necesitan elementos: ${areasWithoutElements.value.map((a) => a.label).join(', ')}`,
+      )
+    } else {
+      toast.error('Por favor, corrige los errores del formulario')
+    }
+    return
+  }
 
   isSubmitting.value = true
 
   try {
-    const accommodationId = await createAccommodationInDatabase(formValues)
+    const accommodation = await accommodationService.create({
+      code: formData.value.code.trim().toUpperCase(),
+      name: formData.value.name.trim(),
+      address: formData.value.address?.trim(),
+      status: formData.value.status,
+      notes: formData.value.notes?.trim(),
+      configured_areas: buildConfiguredAreas(),
+    })
 
-    await saveAreasAndElements(accommodationId, selectedAreas.value, selectedElements.value)
+    if (selectedAreas.value.length > 0 && selectedElements.value.length > 0) {
+      await saveAreasAndElements(accommodation.id, selectedAreas.value, selectedElements.value)
+    }
 
     toast.success('Alojamiento creado exitosamente')
     emit('accommodation-created')
-    resetFormState()
+    resetForm()
     isDialogOpen.value = false
   } catch (error: unknown) {
     handleApiError(error, 'crear alojamiento')
@@ -228,16 +226,6 @@ const handleFormSubmit = async (values: Record<string, unknown>): Promise<void> 
   }
 }
 
-/**
- * Maneja el cambio del código para normalizarlo automáticamente
- */
-const onCodeInput = (event: Event): void => {
-  const input = event.target as HTMLInputElement
-  const normalized = normalizeAccommodationCode(input.value)
-  form.setFieldValue('code', normalized)
-}
-
-// Lifecycle
 onMounted(async () => {
   await loadAreaCatalog()
 })
@@ -253,119 +241,115 @@ onMounted(async () => {
       <DialogHeader>
         <DialogTitle>Crear Alojamiento</DialogTitle>
         <DialogDescription>
-          Completa la información básica del alojamiento y configura sus áreas y elementos.
+          Completa la información del nuevo alojamiento. Los campos marcados son obligatorios.
         </DialogDescription>
       </DialogHeader>
 
-      <Form>
-        <form class="space-y-6 py-4" @submit="form.handleSubmit(handleFormSubmit)">
-          <!-- Información Básica -->
-          <div class="space-y-4 border rounded-md p-4">
-            <h3 class="text-sm font-medium">Información Básica</h3>
+      <div class="grid gap-6 py-4">
+        <!-- Información Básica -->
+        <div class="space-y-4 border rounded-md p-4">
+          <h3 class="text-sm font-medium">Información Básica</h3>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <!-- Código -->
-              <FormField v-slot="{ componentField }" name="code">
-                <FormItem>
-                  <FormLabel>Código *</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Ej: PISO-101"
-                      v-bind="componentField"
-                      @input="onCodeInput"
-                    />
-                  </FormControl>
-                  <FormDescription> Identificador único (mayúsculas) </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-
-              <!-- Nombre -->
-              <FormField v-slot="{ componentField }" name="name">
-                <FormItem>
-                  <FormLabel>Nombre *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: Apartamento Centro" v-bind="componentField" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Código -->
+            <div class="space-y-2">
+              <Label>
+                Código *
+                <span class="text-xs text-muted-foreground ml-2">(1-4 caracteres: A-Z, 0-9)</span>
+              </Label>
+              <Input
+                v-model="formData.code"
+                :class="{ 'border-destructive': errors.code }"
+                maxlength="4"
+                placeholder="Ej: GF01"
+                @blur="validateCode"
+                @input="formData.code = formData.code.toUpperCase()"
+              />
+              <p v-if="errors.code" class="text-sm font-medium text-destructive">
+                {{ errors.code }}
+              </p>
             </div>
 
-            <!-- Dirección -->
-            <FormField v-slot="{ componentField }" name="address">
-              <FormItem>
-                <FormLabel>Dirección</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ej: Calle Mayor 123, Madrid" v-bind="componentField" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <!-- Estado -->
-            <FormField v-slot="{ componentField }" name="status">
-              <FormItem>
-                <FormLabel>Estado *</FormLabel>
-                <Select v-bind="componentField">
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="active">Activo</SelectItem>
-                    <SelectItem value="inactive">Inactivo</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <!-- Notas -->
-            <FormField v-slot="{ componentField }" name="notes">
-              <FormItem>
-                <FormLabel>Notas</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Observaciones adicionales..."
-                    rows="3"
-                    v-bind="componentField"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+            <!-- Nombre -->
+            <div class="space-y-2">
+              <Label>Nombre *</Label>
+              <Input
+                v-model="formData.name"
+                :class="{ 'border-destructive': errors.name }"
+                placeholder="Ej: Apartamento Centro"
+                @blur="validateName"
+              />
+              <p v-if="errors.name" class="text-sm font-medium text-destructive">
+                {{ errors.name }}
+              </p>
+            </div>
           </div>
 
-          <!-- Configuración de Áreas -->
-          <div class="space-y-4 border rounded-md p-4">
-            <h3 class="text-sm font-medium">Configuración de Áreas</h3>
-            <AreaSelector v-model="selectedAreas" :options="areaCatalog" />
+          <div class="space-y-2">
+            <Label>Dirección</Label>
+            <Input v-model="formData.address" placeholder="Ej: Calle Mayor 123, Madrid" />
+            <p class="text-xs text-muted-foreground">Opcional</p>
           </div>
 
-          <!-- Configuración de Elementos -->
-          <div class="space-y-4 border rounded-md p-4">
-            <h3 class="text-sm font-medium">Configuración de Elementos</h3>
-            <AreaElementsConfig
-              v-model="selectedElements"
-              :element-catalog="elementCatalogMap"
-              :selected-areas="selectedAreas"
-            />
+          <div class="space-y-2">
+            <Label>Estado *</Label>
+            <Select v-model="formData.status">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Activo</SelectItem>
+                <SelectItem value="inactive">Inactivo</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <!-- Footer con botones -->
-          <DialogFooter class="gap-2">
-            <Button type="button" variant="outline" @click="isDialogOpen = false">
-              Cancelar
-            </Button>
-            <Button :disabled="!isFormValid || isSubmitting" type="submit">
-              <Spinner v-if="isSubmitting" class="h-4 w-4 mr-2" />
-              {{ isSubmitting ? 'Creando...' : 'Crear Alojamiento' }}
-            </Button>
-          </DialogFooter>
-        </form>
-      </Form>
+          <div class="space-y-2">
+            <Label>Notas</Label>
+            <Textarea v-model="formData.notes" placeholder="Observaciones..." rows="3" />
+            <p class="text-xs text-muted-foreground">Opcional</p>
+          </div>
+        </div>
+
+        <!-- Configuración de Áreas -->
+        <div class="space-y-4 border rounded-md p-4">
+          <h3 class="text-sm font-medium">Configuración de Áreas *</h3>
+          <AreaSelector v-model="selectedAreas" :options="areaCatalog" />
+          <p v-if="selectedAreas.length === 0" class="text-sm text-destructive">
+            Debe seleccionar al menos un área
+          </p>
+        </div>
+
+        <!-- Configuración de Elementos -->
+        <div class="space-y-4 border rounded-md p-4">
+          <h3 class="text-sm font-medium">Configuración de Elementos *</h3>
+          <AreaElementsConfig
+            v-model="selectedElements"
+            :element-catalog="elementCatalogMap"
+            :selected-areas="selectedAreas"
+          />
+
+          <!-- Mensaje específico por área sin elementos -->
+          <div v-if="areasWithoutElements.length > 0" class="space-y-1 mt-3">
+            <p
+              v-for="area in areasWithoutElements"
+              :key="`${area.area_catalog_id}-${area.room_number || 0}`"
+              class="text-sm text-destructive flex items-center gap-1"
+            >
+              <span class="font-bold">⚠️</span>
+              {{ area.label }} no tiene elementos seleccionados
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <DialogFooter class="gap-2">
+        <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancelar </Button>
+        <Button :disabled="!isFormValid || isSubmitting" @click="handleCreate">
+          <Spinner v-if="isSubmitting" class="h-4 w-4 mr-2" />
+          {{ isSubmitting ? 'Creando...' : 'Crear Alojamiento' }}
+        </Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>

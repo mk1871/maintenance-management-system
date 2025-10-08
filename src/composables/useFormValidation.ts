@@ -9,12 +9,8 @@ export const useFormValidation = <TSchema extends z.ZodType>(
   schema: TSchema,
   initialValues?: Partial<z.infer<TSchema>>,
 ) => {
-  const validationSchema = toTypedSchema(schema)
-
-  const form = useForm({
-    validationSchema,
+  return useForm({
+    validationSchema: toTypedSchema(schema),
     initialValues: initialValues as Record<string, unknown>,
   })
-
-  return form
 }

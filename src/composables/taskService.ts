@@ -9,38 +9,38 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 // Constantes
 const ERROR_CODE_NOT_FOUND = 'PGRST116'
 
-// ACTUALIZADO: Query con nuevas relaciones
+// Query con relaciones optimizadas
 const TASK_SELECT_QUERY = `
   *,
   accommodation:accommodations(code, name),
-  area:accommodation_areas(
+  accommodation_area:accommodation_areas(
     id,
     custom_label,
     room_number,
-    area_catalog(key, label, icon)
+    area_catalog:area_catalog(key, label, icon)
   ),
-  element:accommodation_elements(
+  accommodation_element:accommodation_elements(
     id,
     custom_name,
     condition,
-    element_catalog(name)
+    element_catalog:element_catalog(name)
   )
 `
 
 const TASK_DETAIL_SELECT_QUERY = `
   *,
   accommodation:accommodations(code, name),
-  area:accommodation_areas(
+  accommodation_area:accommodation_areas(
     id,
     custom_label,
     room_number,
-    area_catalog(key, label, icon)
+    area_catalog:area_catalog(key, label, icon)
   ),
-  element:accommodation_elements(
+  accommodation_element:accommodation_elements(
     id,
     custom_name,
     condition,
-    element_catalog(name)
+    element_catalog:element_catalog(name)
   ),
   costs(*)
 `
@@ -50,11 +50,8 @@ export interface Task {
   id: string
   accommodation_id: string
   accommodation_code: string
-
-  // CAMBIO: Reemplazar strings por FKs relacionales
-  accommodation_area_id: string // NUEVO: antes era "area: string"
-  accommodation_element_id: string // NUEVO: antes era "element: string"
-
+  accommodation_area_id: string
+  accommodation_element_id: string
   description: string
   priority: TaskPriority
   status: TaskStatus
@@ -71,68 +68,62 @@ export interface Task {
   estimated_cost?: number
   archived: boolean
   created_by: string
-  assigned_to?: string // NUEVO: agregado en migración
+  assigned_to?: string
   updated_at: string
-
-  // Relaciones expandidas (solo cuando se usa SELECT con joins)
   accommodation?: {
     code: string
     name: string
   }
-  area?: AccommodationArea // NUEVO: datos completos del área
-  element?: AccommodationElement // NUEVO: datos completos del elemento
+  accommodation_area?: AccommodationArea
+  accommodation_element?: AccommodationElement
+}
+
+export interface TaskWithRelations extends Task {
+  area_label?: string
+  element_name?: string
 }
 
 export interface CreateTaskData {
   accommodation_id: string
-  accommodation_area_id: string // CAMBIO: antes era "area: string"
-  accommodation_element_id: string // CAMBIO: antes era "element: string"
+  accommodation_area_id: string
+  accommodation_element_id: string
   description: string
   priority: TaskPriority
   due_date: string
   notes?: string
   estimated_cost?: number
-  assigned_to?: string // NUEVO: opcional para asignar a otro supervisor
+  assigned_to?: string
 }
 
 export interface UpdateTaskData {
   id: string
   status?: TaskStatus
-  accommodation_area_id?: string // NUEVO: permitir cambio de área
-  accommodation_element_id?: string // NUEVO: permitir cambio de elemento
+  accommodation_area_id?: string
+  accommodation_element_id?: string
   repairer_name?: string
   start_date?: string
   completed_date?: string
   solution?: string
   notes?: string
-  assigned_to?: string // NUEVO: reasignar tarea
+  assigned_to?: string
 }
 
-/**
- * Valida que el ID de tarea sea válido
- */
 const validateTaskId = (id: string): void => {
   if (!id || id.trim().length === 0) {
     throw new Error('El ID de tarea es requerido')
   }
 }
 
-/**
- * Valida los datos de creación de tarea
- */
 const validateCreateTaskData = (taskData: CreateTaskData): void => {
   if (!taskData.accommodation_id) {
     throw new Error('El ID del alojamiento es requerido')
   }
-
-  // CAMBIO: Validar IDs en lugar de strings
   if (!taskData.accommodation_area_id || taskData.accommodation_area_id.trim().length === 0) {
     throw new Error('El área es requerida')
   }
   if (!taskData.accommodation_element_id || taskData.accommodation_element_id.trim().length === 0) {
     throw new Error('El elemento es requerido')
   }
-
   if (!taskData.description || taskData.description.trim().length < 10) {
     throw new Error('La descripción debe tener al menos 10 caracteres')
   }
@@ -141,35 +132,49 @@ const validateCreateTaskData = (taskData: CreateTaskData): void => {
   }
 }
 
-/**
- * Valida los datos de actualización de tarea
- */
 const validateUpdateTaskData = (taskData: UpdateTaskData): void => {
   if (!taskData.id || taskData.id.trim().length === 0) {
     throw new Error('El ID de tarea es requerido')
   }
 }
 
-/**
- * Genera mensaje de error descriptivo según el contexto
- */
 const getErrorMessage = (error: Error, context: string): string => {
   const baseMessage = error.message || 'Error desconocido'
   return `Error al ${context}: ${baseMessage}`
 }
 
-/**
- * Obtiene la fecha actual en formato ISO
- */
 const getCurrentTimestamp = (): string => {
   return new Date().toISOString()
 }
 
+const extractAreaLabel = (task: Task): string => {
+  if (!task.accommodation_area) return 'N/A'
+  const customLabel = task.accommodation_area.custom_label
+  const catalogLabel = task.accommodation_area.area_catalog?.label
+  const roomNumber = task.accommodation_area.room_number
+  const baseLabel = customLabel || catalogLabel || 'Área'
+  return roomNumber ? `${baseLabel} ${roomNumber}` : baseLabel
+}
+
+const extractElementName = (task: Task): string => {
+  if (!task.accommodation_element) return 'N/A'
+  return (
+    task.accommodation_element.custom_name ||
+    task.accommodation_element.element_catalog?.name ||
+    'Elemento'
+  )
+}
+
+const transformTaskWithLabels = (task: Task): TaskWithRelations => {
+  return {
+    ...task,
+    area_label: extractAreaLabel(task),
+    element_name: extractElementName(task),
+  }
+}
+
 export const taskService = {
-  /**
-   * Obtiene todas las tareas ordenadas por fecha de creación
-   */
-  async getAll(): Promise<Task[]> {
+  async getAll(): Promise<TaskWithRelations[]> {
     const { data, error } = await supabase
       .from('tasks')
       .select(TASK_SELECT_QUERY)
@@ -179,13 +184,10 @@ export const taskService = {
       throw new Error(getErrorMessage(error, 'obtener tareas'))
     }
 
-    return data as Task[]
+    return (data as Task[]).map(transformTaskWithLabels)
   },
 
-  /**
-   * Obtiene una tarea específica por su ID con sus costos asociados
-   */
-  async getById(id: string): Promise<Task | null> {
+  async getById(id: string): Promise<TaskWithRelations | null> {
     validateTaskId(id)
 
     const { data, error } = await supabase
@@ -201,16 +203,12 @@ export const taskService = {
       throw new Error(getErrorMessage(error, 'obtener tarea'))
     }
 
-    return data as Task
+    return transformTaskWithLabels(data as Task)
   },
 
-  /**
-   * Crea una nueva tarea con fecha de detección automática
-   */
-  async create(taskData: CreateTaskData): Promise<Task> {
+  async create(taskData: CreateTaskData): Promise<TaskWithRelations> {
     validateCreateTaskData(taskData)
 
-    // CAMBIO: Usar nuevos campos relacionales
     const taskToCreate = {
       accommodation_id: taskData.accommodation_id,
       accommodation_area_id: taskData.accommodation_area_id,
@@ -227,20 +225,17 @@ export const taskService = {
     const { data, error } = await supabase
       .from('tasks')
       .insert([taskToCreate])
-      .select(TASK_SELECT_QUERY) // CAMBIO: Traer datos relacionados
+      .select(TASK_SELECT_QUERY)
       .single()
 
     if (error) {
       throw new Error(getErrorMessage(error, 'crear tarea'))
     }
 
-    return data as Task
+    return transformTaskWithLabels(data as Task)
   },
 
-  /**
-   * Actualiza una tarea existente con timestamp automático
-   */
-  async update(taskData: UpdateTaskData): Promise<Task> {
+  async update(taskData: UpdateTaskData): Promise<TaskWithRelations> {
     validateUpdateTaskData(taskData)
 
     const taskToUpdate = {
@@ -252,19 +247,16 @@ export const taskService = {
       .from('tasks')
       .update(taskToUpdate)
       .eq('id', taskData.id)
-      .select(TASK_SELECT_QUERY) // CAMBIO: Traer datos relacionados
+      .select(TASK_SELECT_QUERY)
       .single()
 
     if (error) {
       throw new Error(getErrorMessage(error, 'actualizar tarea'))
     }
 
-    return data as Task
+    return transformTaskWithLabels(data as Task)
   },
 
-  /**
-   * Elimina una tarea por su ID
-   */
   async delete(id: string): Promise<void> {
     validateTaskId(id)
 

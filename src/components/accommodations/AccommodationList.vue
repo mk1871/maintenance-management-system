@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MoreHorizontal, Search, Eye } from 'lucide-vue-next'
+import { MoreHorizontal, Search, Eye, Trash2 } from 'lucide-vue-next'
 
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 import { useAccommodationForm } from '@/composables/useAccommodationForm'
@@ -74,9 +74,7 @@ const filterAccommodationsBySearch = (): Accommodation[] => {
 
   const query = normalizeSearchQuery(searchQuery.value)
 
-  return props.accommodations.filter((accommodation) =>
-    matchesSearchQuery(accommodation, query)
-  )
+  return props.accommodations.filter((accommodation) => matchesSearchQuery(accommodation, query))
 }
 
 /**
@@ -182,11 +180,7 @@ const formatDate = (dateString: string): string => {
     <!-- Buscador -->
     <div class="relative w-full md:w-[300px]">
       <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-      <Input
-        v-model="searchQuery"
-        class="pl-8"
-        placeholder="Buscar alojamientos..."
-      />
+      <Input v-model="searchQuery" class="pl-8" placeholder="Buscar alojamientos..." />
     </div>
 
     <!-- Loading State con Skeletons -->
@@ -274,9 +268,10 @@ const formatDate = (dateString: string): string => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    class="text-destructive"
+                    class="text-destructive focus:text-destructive"
                     @click="openDeleteDialog(accommodation)"
                   >
+                    <Trash2 class="mr-2 h-4 w-4" />
                     Eliminar
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -299,9 +294,7 @@ const formatDate = (dateString: string): string => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="closeDeleteDialog">
-            Cancelar
-          </AlertDialogCancel>
+          <AlertDialogCancel @click="closeDeleteDialog"> Cancelar </AlertDialogCancel>
           <AlertDialogAction
             :disabled="isDeleting"
             class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
