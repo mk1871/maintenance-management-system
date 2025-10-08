@@ -39,6 +39,19 @@ const emit = defineEmits<{
   (e: 'task-created'): void
 }>()
 
+// Constantes
+const AREA_LABELS: Record<string, string> = {
+  living_room: 'Sala de Estar',
+  kitchen: 'Cocina',
+  bathroom_1: 'Baño Principal',
+  bathroom_2: 'Segundo Baño',
+  bedroom_1: 'Dormitorio Principal',
+  bedroom_2: 'Segundo Dormitorio',
+  bedroom_3: 'Tercer Dormitorio',
+  terrace: 'Terraza',
+  garage: 'Garaje',
+}
+
 interface TaskFormData {
   accommodation_id: string
   area: string
@@ -74,6 +87,13 @@ const isDialogOpen = ref(false)
 const df = new DateFormatter('es-ES', {
   dateStyle: 'long',
 })
+
+/**
+ * Traduce una clave de área a su etiqueta en español
+ */
+const getAreaLabel = (areaKey: string): string => {
+  return AREA_LABELS[areaKey] || areaKey
+}
 
 /**
  * Carga los alojamientos desde la base de datos
@@ -344,7 +364,7 @@ const handleAreaChange = (): void => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="a in areas" :key="a" :value="a">
-                  {{ a }}
+                  {{ getAreaLabel(a) }}
                 </SelectItem>
               </SelectContent>
             </Select>

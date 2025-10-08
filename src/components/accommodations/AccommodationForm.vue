@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
 
-// Componentes UI
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,18 +13,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 
-// Composables
+import AccommodationBasicInfo from './AccommodationBasicInfo.vue'
+import AreaSelector from './AreaSelector.vue'
+import AreaElementsConfig, { type AreaConfig } from './AreaElementsConfig.vue'
+
 import {
   accommodationService,
   type CreateAccommodationData,
@@ -33,36 +26,13 @@ import {
 
 // Emits
 const emit = defineEmits<{
-  (e: 'accommodation-created'): void
+  'accommodation-created': []
 }>()
 
 const router = useRouter()
 
-// Interfaces
-interface FormData {
-  code: string
-  name: string
-  address: string
-  status: 'active' | 'inactive'
-}
-
-interface AreaOption {
-  value: string
-  label: string
-}
-
-interface FormErrors {
-  code: string
-  name: string
-}
-
-// Constantes de configuración
-const MIN_CODE_LENGTH = 2
-const MAX_CODE_LENGTH = 4
-const MIN_NAME_LENGTH = 3
-const CODE_PATTERN = /^[A-Z0-9]+$/
-
-const AREA_OPTIONS: AreaOption[] = [
+// Constantes
+const AREA_OPTIONS = [
   { value: 'living_room', label: 'Sala de Estar' },
   { value: 'kitchen', label: 'Cocina' },
   { value: 'bathroom_1', label: 'Baño Principal' },
@@ -75,152 +45,110 @@ const AREA_OPTIONS: AreaOption[] = [
 ]
 
 // Estado
-const formData = ref<FormData>({
+const basicInfo = ref({
   code: '',
   name: '',
   address: '',
-  status: 'active',
+  status: 'active' as 'active' | 'inactive',
 })
 
-// Áreas seleccionadas
-const areas = ref<Record<string, boolean>>({
-  living_room: false,
-  kitchen: false,
-  bathroom_1: false,
-  bathroom_2: false,
-  bedroom_1: false,
-  bedroom_2: false,
-  bedroom_3: false,
-  terrace: false,
-  garage: false,
-})
-
-const errors = ref<FormErrors>({
+const basicInfoErrors = ref({
   code: '',
   name: '',
 })
 
+const selectedAreaKeys = ref<string[]>([])
+const areaConfigs = ref<AreaConfig[]>([])
 const isSubmitting = ref(false)
 const isDialogOpen = ref(false)
 
 /**
- * Contador de áreas seleccionadas
+ * Sincroniza las áreas seleccionadas con la configuración
  */
-const selectedAreasCount = computed(() => {
-  return Object.values(areas.value).filter(Boolean).length
+const syncAreaConfigs = (areaKeys: string[]): void => {
+  // Crear configs para nuevas áreas
+  areaKeys.forEach((key) => {
+    if (!areaConfigs.value.some((config) => config.key === key)) {
+      const label = AREA_OPTIONS.find((opt) => opt.value === key)?.label || key
+      areaConfigs.value.push({
+        key,
+        label,
+        elements: [],
+      })
+    }
+  })
+
+  // Remover configs de áreas deseleccionadas
+  areaConfigs.value = areaConfigs.value.filter((config) => areaKeys.includes(config.key))
+}
+
+/**
+ * Maneja el cambio de áreas seleccionadas
+ */
+const handleAreaChange = (newAreaKeys: string[]): void => {
+  selectedAreaKeys.value = newAreaKeys
+  syncAreaConfigs(newAreaKeys)
+}
+
+/**
+ * Verifica si todas las áreas tienen al menos un elemento
+ */
+const allAreasHaveElements = computed(() => {
+  return areaConfigs.value.every((config) => config.elements.length > 0)
 })
 
 /**
- * Valida que al menos un área esté seleccionada
- */
-const hasSelectedAreas = computed(() => {
-  return selectedAreasCount.value > 0
-})
-
-/**
- * Verifica si el formulario es válido para envío
+ * Verifica si el formulario es válido
  */
 const isFormValid = computed(() => {
   return (
-    !errors.value.code &&
-    !errors.value.name &&
-    formData.value.code.length >= MIN_CODE_LENGTH &&
-    formData.value.name.length >= MIN_NAME_LENGTH &&
-    hasSelectedAreas.value
+    !basicInfoErrors.value.code &&
+    !basicInfoErrors.value.name &&
+    basicInfo.value.code.length >= 2 &&
+    basicInfo.value.name.length >= 3 &&
+    selectedAreaKeys.value.length > 0 &&
+    allAreasHaveElements.value
   )
 })
 
 /**
- * Valida el campo código del alojamiento
- */
-const validateCode = (): void => {
-  const code = formData.value.code.trim()
-
-  if (!code) {
-    errors.value.code = 'El código es requerido'
-    return
-  }
-
-  if (code.length < MIN_CODE_LENGTH || code.length > MAX_CODE_LENGTH) {
-    errors.value.code = `El código debe tener entre ${MIN_CODE_LENGTH} y ${MAX_CODE_LENGTH} caracteres`
-    return
-  }
-
-  if (!CODE_PATTERN.test(code)) {
-    errors.value.code = 'Solo se permiten letras mayúsculas y números'
-    return
-  }
-
-  errors.value.code = ''
-}
-
-/**
- * Valida el campo nombre del alojamiento
- */
-const validateName = (): void => {
-  const name = formData.value.name.trim()
-
-  if (!name) {
-    errors.value.name = 'El nombre es requerido'
-    return
-  }
-
-  if (name.length < MIN_NAME_LENGTH) {
-    errors.value.name = `El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`
-    return
-  }
-
-  errors.value.name = ''
-}
-
-/**
- * Convierte el objeto de áreas al formato de base de datos
+ * Convierte las configuraciones de áreas al formato de base de datos
  */
 const buildConfiguredAreas = (): Record<string, string[]> => {
   return Object.fromEntries(
-    Object.entries(areas.value)
-      .filter(([, isSelected]) => isSelected)
-      .map(([areaKey]) => [areaKey, []])
+    areaConfigs.value.map((config) => [config.key, config.elements])
   )
 }
 
 /**
- * Resetea el formulario a su estado inicial
+ * Resetea el formulario
  */
 const resetForm = (): void => {
-  formData.value = {
+  basicInfo.value = {
     code: '',
     name: '',
     address: '',
     status: 'active',
   }
-  areas.value = {
-    living_room: false,
-    kitchen: false,
-    bathroom_1: false,
-    bathroom_2: false,
-    bedroom_1: false,
-    bedroom_2: false,
-    bedroom_3: false,
-    terrace: false,
-    garage: false,
+  basicInfoErrors.value = {
+    code: '',
+    name: '',
   }
-  errors.value.code = ''
-  errors.value.name = ''
+  selectedAreaKeys.value = []
+  areaConfigs.value = []
 }
 
 /**
- * Maneja la creación de un nuevo alojamiento
+ * Maneja la creación del alojamiento
  */
 const handleCreate = async (): Promise<void> => {
-  validateCode()
-  validateName()
-
   if (!isFormValid.value) {
-    if (!hasSelectedAreas.value) {
+    if (selectedAreaKeys.value.length === 0) {
       toast.error('Debes seleccionar al menos un área')
+    } else if (!allAreasHaveElements.value) {
+      toast.error('Todas las áreas deben tener al menos un elemento')
     } else {
-      toast.error('Por favor, corrige los errores del formulario')
+      toast.error('Por favor, completa todos los campos requeridos')
     }
     return
   }
@@ -228,10 +156,10 @@ const handleCreate = async (): Promise<void> => {
   isSubmitting.value = true
 
   const accommodationData: CreateAccommodationData = {
-    code: formData.value.code.trim().toUpperCase(),
-    name: formData.value.name.trim(),
-    address: formData.value.address.trim(),
-    status: formData.value.status,
+    code: basicInfo.value.code.trim().toUpperCase(),
+    name: basicInfo.value.name.trim(),
+    address: basicInfo.value.address.trim(),
+    status: basicInfo.value.status,
     configured_areas: buildConfiguredAreas(),
   }
 
@@ -256,7 +184,7 @@ const handleCreate = async (): Promise<void> => {
     <DialogTrigger as-child>
       <Button>Nuevo Alojamiento</Button>
     </DialogTrigger>
-    <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <DialogContent class="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Crear Alojamiento</DialogTitle>
         <DialogDescription>
@@ -265,92 +193,24 @@ const handleCreate = async (): Promise<void> => {
       </DialogHeader>
 
       <div class="grid gap-6 py-4">
-        <!-- Código -->
-        <div class="space-y-2">
-          <Label>
-            Código *
-            <span class="text-xs text-muted-foreground ml-2"> (2-4 caracteres: A-Z, 0-9) </span>
-          </Label>
-          <Input
-            v-model="formData.code"
-            :class="{ 'border-destructive': errors.code }"
-            maxlength="4"
-            placeholder="Ej: AP01"
-            @blur="validateCode"
-            @input="formData.code = formData.code.toUpperCase()"
-          />
-          <p v-if="errors.code" class="text-sm font-medium text-destructive">
-            {{ errors.code }}
-          </p>
-        </div>
+        <!-- Información Básica -->
+        <AccommodationBasicInfo
+          v-model="basicInfo"
+          v-model:errors="basicInfoErrors"
+        />
 
-        <!-- Nombre -->
-        <div class="space-y-2">
-          <Label>Nombre *</Label>
-          <Input
-            v-model="formData.name"
-            :class="{ 'border-destructive': errors.name }"
-            placeholder="Ej: Apartamento Centro"
-            @blur="validateName"
-          />
-          <p v-if="errors.name" class="text-sm font-medium text-destructive">
-            {{ errors.name }}
-          </p>
-        </div>
+        <!-- Selector de Áreas -->
+        <AreaSelector
+          :model-value="selectedAreaKeys"
+          :options="AREA_OPTIONS"
+          @update:model-value="handleAreaChange"
+        />
 
-        <!-- Dirección -->
-        <div class="space-y-2">
-          <Label>Dirección</Label>
-          <Input v-model="formData.address" placeholder="Ej: Calle Mayor 123, 3º B" />
-          <p class="text-xs text-muted-foreground">Opcional</p>
-        </div>
-
-        <!-- Estado -->
-        <div class="space-y-2">
-          <Label>Estado *</Label>
-          <Select v-model="formData.status">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="inactive">Inactivo</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <!-- Áreas con checkbox estilizado como shadcn-vue -->
-        <div class="space-y-2">
-          <Label>Áreas del Alojamiento *</Label>
-          <p class="text-sm text-muted-foreground mb-2">
-            Selecciona las áreas que tiene este alojamiento
-          </p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 border rounded-md p-4">
-            <div
-              v-for="option in AREA_OPTIONS"
-              :key="option.value"
-              class="flex items-center space-x-2"
-            >
-              <input
-                :id="option.value"
-                v-model="areas[option.value]"
-                class="peer h-4 w-4 shrink-0 rounded-[4px] border border-input shadow-xs transition-shadow cursor-pointer
-               focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring
-               disabled:cursor-not-allowed disabled:opacity-50
-               checked:bg-primary checked:text-primary-foreground checked:border-primary
-               hover:border-ring/50"
-                type="checkbox"
-              />
-              <Label :for="option.value" class="cursor-pointer text-sm font-normal">
-                {{ option.label }}
-              </Label>
-            </div>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            Áreas seleccionadas: {{ selectedAreasCount }}
-          </p>
-        </div>
-
+        <!-- Configuración de Elementos -->
+        <AreaElementsConfig
+          :areas="areaConfigs"
+          @update:areas="(newConfigs) => (areaConfigs = newConfigs)"
+        />
       </div>
 
       <DialogFooter class="gap-2">
