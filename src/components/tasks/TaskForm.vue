@@ -43,7 +43,10 @@ import { taskService } from '@/composables/taskService'
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 import { useAccommodationAreaService } from '@/composables/accommodationAreaService'
 import { useFormValidation } from '@/composables/useFormValidation'
-import type { AccommodationArea, AccommodationElement } from '@/composables/accommodationAreaService'
+import type {
+  AccommodationArea,
+  AccommodationElement,
+} from '@/composables/accommodationAreaService'
 
 // Emits
 const emit = defineEmits<{
@@ -57,10 +60,7 @@ const taskFormSchema = z.object({
   accommodation_element_id: z.string().min(1, 'Elemento requerido'),
   description: z.string().min(10, 'La descripción debe tener al menos 10 caracteres'),
   priority: z.enum(['low', 'medium', 'high']),
-  due_date: z.string().refine(
-    (date) => new Date(date) > new Date(),
-    'La fecha debe ser futura'
-  ),
+  due_date: z.string().refine((date) => new Date(date) > new Date(), 'La fecha debe ser futura'),
   estimated_cost: z.string().optional(),
   assigned_to: z.string().optional(),
 })
@@ -136,7 +136,7 @@ watch(
 
     form.setFieldValue('accommodation_area_id', '')
     form.setFieldValue('accommodation_element_id', '')
-  }
+  },
 )
 
 /**
@@ -146,7 +146,7 @@ watch(
   () => form.values.accommodation_area_id,
   () => {
     form.setFieldValue('accommodation_element_id', '')
-  }
+  },
 )
 
 /**
@@ -222,23 +222,34 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
 
   return df.format(dateValue.toDate(getLocalTimeZone()))
 }
+/**
+ * Maneja la actualización de fecha del Calendar
+ */
+const handleDateUpdate = (value: DateValue | undefined): void => {
+  if (!value) return
+
+  form.setFieldValue('due_date', value.toString())
+}
 
 /**
  * Maneja el submit del formulario
  */
-const onSubmit = form.handleSubmit(async (values: TaskFormValues) => {
+const handleFormSubmit = async (values: Record<string, unknown>): Promise<void> => {
+  // Type assertion segura
+  const formValues = values as TaskFormValues
+
   isSubmitting.value = true
 
   try {
     await taskService.create({
-      accommodation_id: values.accommodation_id,
-      accommodation_area_id: values.accommodation_area_id,
-      accommodation_element_id: values.accommodation_element_id,
-      description: values.description,
-      priority: values.priority,
-      due_date: values.due_date,
-      estimated_cost: values.estimated_cost ? parseFloat(values.estimated_cost) : undefined,
-      assigned_to: values.assigned_to,
+      accommodation_id: formValues.accommodation_id,
+      accommodation_area_id: formValues.accommodation_area_id,
+      accommodation_element_id: formValues.accommodation_element_id,
+      description: formValues.description,
+      priority: formValues.priority,
+      due_date: formValues.due_date,
+      estimated_cost: formValues.estimated_cost ? parseFloat(formValues.estimated_cost) : undefined,
+      assigned_to: formValues.assigned_to,
     })
 
     toast.success('Tarea creada exitosamente')
@@ -251,7 +262,7 @@ const onSubmit = form.handleSubmit(async (values: TaskFormValues) => {
   } finally {
     isSubmitting.value = false
   }
-})
+}
 </script>
 
 <template>
@@ -268,7 +279,7 @@ const onSubmit = form.handleSubmit(async (values: TaskFormValues) => {
       </DialogHeader>
 
       <Form>
-        <form class="grid gap-6 py-4" @submit="onSubmit">
+        <form class="grid gap-6 py-4" @submit="form.handleSubmit(handleFormSubmit)">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Alojamiento -->
             <FormField v-slot="{ componentField }" name="accommodation_id">
@@ -349,17 +360,18 @@ const onSubmit = form.handleSubmit(async (values: TaskFormValues) => {
             <FormField v-slot="{ componentField }" name="accommodation_element_id">
               <FormItem>
                 <FormLabel>Elemento *</FormLabel>
-                <Select
-                  :disabled="!form.values.accommodation_area_id"
-                  v-bind="componentField"
-                >
+                <Select :disabled="!form.values.accommodation_area_id" v-bind="componentField">
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar elemento" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem v-for="element in availableElements" :key="element.id" :value="element.id">
+                    <SelectItem
+                      v-for="element in availableElements"
+                      :key="element.id"
+                      :value="element.id"
+                    >
                       {{ getElementName(element) }}
                     </SelectItem>
                   </SelectContent>
@@ -396,10 +408,12 @@ const onSubmit = form.handleSubmit(async (values: TaskFormValues) => {
                   <PopoverTrigger as-child>
                     <FormControl>
                       <Button
-                        :class="cn(
-                          'w-full justify-start text-left font-normal',
-                          !componentField.modelValue && 'text-muted-foreground',
-                        )"
+                        :class="
+                          cn(
+                            'w-full justify-start text-left font-normal',
+                            !componentField.modelValue && 'text-muted-foreground',
+                          )
+                        "
                         variant="outline"
                       >
                         <CalendarIcon class="mr-2 h-4 w-4" />
@@ -412,11 +426,7 @@ const onSubmit = form.handleSubmit(async (values: TaskFormValues) => {
                       :model-value="stringToDateValue(componentField.modelValue)"
                       initial-focus
                       locale="es"
-                      @update:model-value="(value) => {
-                        if (value) {
-                          componentField['onUpdate:modelValue'](value.toString())
-                        }
-                      }"
+                      @update:model-value="handleDateUpdate"
                     />
                   </PopoverContent>
                 </Popover>
