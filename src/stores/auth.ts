@@ -17,53 +17,37 @@ export const useAuthStore = defineStore('auth', () => {
   const fullName = computed(() => userProfile.value?.full_name)
   const userId = computed(() => supabaseUser.value?.id ?? null)
 
-  /**
-   * Establece el usuario de Supabase
-   */
   const setUser = (user: User | null): void => {
     supabaseUser.value = user
   }
 
-  /**
-   * Establece el perfil del usuario
-   */
   const setUserProfile = (profile: UserProfile | null): void => {
     userProfile.value = profile
     if (profile) error.value = null
   }
 
-  /**
-   * Establece un mensaje de error
-   */
   const setError = (errorMessage: string | null): void => {
     error.value = errorMessage
   }
 
-  /**
-   * Limpia toda la autenticación
-   */
   const clearAuth = (): void => {
     supabaseUser.value = null
     userProfile.value = null
     error.value = null
   }
 
-  /**
-   * Limpia solo el error
-   */
   const clearError = (): void => {
     error.value = null
   }
 
   /**
-   * Verifica sesión activa y carga perfil
+   * Revisa sesión activa y carga perfil de usuario.
+   * NUNCA crea el perfil - el trigger de BD lo hace automáticamente.
    */
   const checkAuth = async (): Promise<void> => {
-    // Evitar llamadas simultáneas
     if (isLoading.value) return
 
     isLoading.value = true
-    error.value = null
 
     try {
       const {
@@ -78,23 +62,28 @@ export const useAuthStore = defineStore('auth', () => {
 
       setUser(user)
 
-      // Cargar perfil
+      // SOLO LEER el perfil, NUNCA insertarlo
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
-      if (profileError || !profile) {
-        console.error('Profile error:', profileError)
-        setError('Perfil no encontrado')
+      if (profileError) {
+        console.error('Profile not found. Trigger should have created it:', profileError)
+        setError('Perfil de usuario no encontrado')
         clearAuth()
         return
       }
 
-      setUserProfile(profile)
+      if (profile) {
+        setUserProfile(profile)
+      } else {
+        setError('Perfil de usuario no encontrado')
+        clearAuth()
+      }
     } catch (err: unknown) {
-      console.error('Auth check error:', err)
+      console.error('Auth check error', err)
       clearAuth()
       setError((err as Error)?.message ?? 'Error desconocido')
     } finally {
@@ -103,27 +92,23 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Inicializa listeners de autenticación
+   * Inicializa el listener de auth state
    */
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
 
-    // ✅ Listener filtrado para evitar loops
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
-      console.log('Auth event:', event)
-
-      // Solo reaccionar a eventos específicos
+      // ✅ SOLO SIGNED_IN (quitar USER_UPDATED que causaba el loop)
       if (event === 'SIGNED_IN') {
         await checkAuth()
       } else if (event === 'SIGNED_OUT') {
         clearAuth()
       }
-      // Ignorar: TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION
     })
 
-    return () => subscription.unsubscribe()
+    return subscription.unsubscribe
   }
 
   return {

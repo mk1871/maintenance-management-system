@@ -82,7 +82,7 @@ router.beforeEach(async (to, from, next) => {
   if (authStore.isLoading) {
     let waited = 0
     while (authStore.isLoading && waited < 3000) {
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
       waited += 100
     }
   }
@@ -93,7 +93,7 @@ router.beforeEach(async (to, from, next) => {
   } else {
     next({
       name: 'Login',
-      query: { redirect: to.fullPath }
+      query: { redirect: to.fullPath },
     })
   }
 })
