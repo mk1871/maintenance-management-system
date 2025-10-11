@@ -27,7 +27,10 @@ onMounted(() => {
     <Toaster class="pointer-events-auto" position="bottom-right" />
 
     <!-- Spinner *solo* en la carga inicial (sin usuario aún) -->
-    <div v-if="authStore.isLoading && !authStore.supabaseUser" class="h-screen flex items-center justify-center">
+    <div
+      v-if="authStore.isLoading && !authStore.supabaseUser"
+      class="h-screen flex items-center justify-center"
+    >
       <Spinner class="h-12 w-12" />
     </div>
 

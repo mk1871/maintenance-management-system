@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 import {
   HomeIcon,
   Building2Icon,
@@ -39,7 +40,9 @@ const formatRole = (role: string | null): string => {
   return roleMap[role] || role
 }
 
-const getRoleBadgeVariant = (role: string | null): 'default' | 'destructive' | 'outline' | 'secondary' => {
+const getRoleBadgeVariant = (
+  role: string | null,
+): 'default' | 'destructive' | 'outline' | 'secondary' => {
   if (!role) return 'secondary'
   const variantMap: Record<string, 'default' | 'destructive' | 'outline' | 'secondary'> = {
     supervisor: 'default',
@@ -71,9 +74,12 @@ const closeMobileMenu = () => {
       v-if="authStore.isAuthenticated"
       class="hidden md:flex w-64 bg-background border-r flex-col"
     >
-      <div class="p-4">
-        <h1 class="text-xl font-bold text-foreground">Sistema de Gestión</h1>
-        <p class="text-xs text-muted-foreground mt-1">Mantenimiento</p>
+      <div class="p-4 flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-bold text-foreground">Sistema de Gestión</h1>
+          <p class="text-xs text-muted-foreground mt-1">Mantenimiento</p>
+        </div>
+        <ThemeToggle />
       </div>
 
       <Separator />
@@ -117,12 +123,7 @@ const closeMobileMenu = () => {
             </Badge>
           </div>
 
-          <Button
-            aria-label="Cerrar sesión"
-            size="icon"
-            variant="ghost"
-            @click="handleLogout"
-          >
+          <Button aria-label="Cerrar sesión" size="icon" variant="ghost" @click="handleLogout">
             <LogOutIcon class="h-5 w-5" />
           </Button>
         </div>
@@ -133,6 +134,7 @@ const closeMobileMenu = () => {
     <div v-if="authStore.isAuthenticated" class="md:hidden fixed top-0 left-0 right-0 z-50">
       <div class="bg-background border-b p-4 flex items-center justify-between">
         <h1 class="text-lg font-bold text-foreground">Sistema de Gestión</h1>
+        <ThemeToggle />
         <Sheet v-model:open="isMobileMenuOpen">
           <SheetTrigger as-child>
             <Button aria-label="Abrir menú" size="icon" variant="outline">
@@ -202,9 +204,7 @@ const closeMobileMenu = () => {
     <!-- Main Content -->
     <main
       :class="[
-        authStore.isAuthenticated
-          ? 'flex-1 overflow-auto p-6 md:p-6 pt-20 md:pt-6'
-          : 'flex-1',
+        authStore.isAuthenticated ? 'flex-1 overflow-auto p-6 md:p-6 pt-20 md:pt-6' : 'flex-1',
       ]"
     >
       <slot />
