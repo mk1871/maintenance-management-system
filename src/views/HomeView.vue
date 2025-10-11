@@ -45,17 +45,28 @@ const getPriorityVariant = (priority: string): 'default' | 'destructive' | 'seco
 /**
  * Obtiene variante de badge según estado
  */
-const getStatusVariant = (status: string): 'default' | 'outline' | 'secondary' => {
-  const variants: Record<string, 'default' | 'outline' | 'secondary'> = {
+const getStatusVariant = (status: string): 'default' | 'outline' | 'secondary' | 'destructive' => {
+  const variants: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
     pending: 'secondary',
     in_progress: 'default',
     completed: 'outline',
+    cancelled: 'destructive',
   }
   return variants[status] ?? 'secondary'
 }
 
 /**
- * Traduce prioridad a español
+ * Obtiene clases adicionales para badge de estado (solo para completed)
+ */
+const getStatusClasses = (status: string): string => {
+  if (status === 'completed') {
+    return 'border-green-600 text-green-600 dark:border-green-400 dark:text-green-400'
+  }
+  return ''
+}
+
+/**
+ * Traduce prioridad
  */
 const translatePriority = (priority: string): string => {
   const translations: Record<string, string> = {
@@ -67,7 +78,7 @@ const translatePriority = (priority: string): string => {
 }
 
 /**
- * Traduce estado a español
+ * Traduce estado
  */
 const translateStatus = (status: string): string => {
   const translations: Record<string, string> = {
@@ -80,6 +91,17 @@ const translateStatus = (status: string): string => {
 }
 
 /**
+ * Formatea fecha
+ */
+const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('es-ES', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+/**
  * Navega al detalle de una tarea
  */
 const navigateToTask = (taskId: string): void => {
@@ -87,10 +109,10 @@ const navigateToTask = (taskId: string): void => {
 }
 
 /**
- * Navega a la lista de tareas
+ * Navega a la vista de tareas
  */
 const navigateToTasks = (): void => {
-  router.push({ name: 'Tasks' })
+  router.push('/tasks')
 }
 
 // Lifecycle
@@ -108,105 +130,125 @@ onMounted(async () => {
   <div class="space-y-6">
     <!-- Header -->
     <div>
-      <h1 class="text-3xl font-bold">Dashboard</h1>
-      <p class="text-muted-foreground">
-        Resumen general del sistema de gestión de mantenimiento
-      </p>
+      <h1 class="text-3xl font-bold tracking-tight">Dashboard</h1>
+      <p class="text-muted-foreground">Resumen general del sistema de mantenimiento</p>
     </div>
 
     <!-- Loading State -->
-    <div v-if="isLoading" class="space-y-6">
+    <div v-if="isLoading" class="space-y-4">
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Skeleton v-for="i in 7" :key="`skeleton-${i}`" class="h-32" />
+        <Skeleton v-for="i in 4" :key="i" class="h-32" />
       </div>
+      <Skeleton class="h-64" />
     </div>
 
-    <!-- Dashboard Content -->
-    <div v-else class="space-y-6">
-      <!-- Estadísticas -->
-      <DashboardStats :format-currency="formatCurrency" :stats="stats" />
+    <!-- Stats Cards -->
+    <DashboardStats v-else :format-currency="formatCurrency" :stats="stats" />
 
-      <!-- Tareas Vencidas Alert -->
-      <Card v-if="overdueTasks.length > 0" class="border-destructive">
-        <CardHeader>
+    <!-- Tareas Vencidas (si hay) -->
+    <Card v-if="overdueTasks.length > 0" class="border-red-200 dark:border-red-900">
+      <CardHeader>
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <AlertCircle class="h-5 w-5 text-destructive" />
-            <CardTitle>Tareas Vencidas</CardTitle>
+            <AlertCircle class="h-5 w-5 text-red-600 dark:text-red-400" />
+            <CardTitle class="text-red-600 dark:text-red-400">Tareas Vencidas</CardTitle>
           </div>
-          <CardDescription>
-            Hay {{ overdueTasks.length }} tarea{{ overdueTasks.length !== 1 ? 's' : '' }}
-            vencida{{ overdueTasks.length !== 1 ? 's' : '' }} que requieren atención inmediata
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" @click="navigateToTasks">
-            Ver Tareas Vencidas
+          <Badge variant="destructive">{{ overdueTasks.length }}</Badge>
+        </div>
+        <CardDescription>Requieren atención inmediata</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Descripción</TableHead>
+              <TableHead>Alojamiento</TableHead>
+              <TableHead>Prioridad</TableHead>
+              <TableHead>Vencimiento</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow
+              v-for="task in overdueTasks"
+              :key="task.id"
+              class="cursor-pointer hover:bg-muted/50"
+              @click="navigateToTask(task.id)"
+            >
+              <TableCell class="font-medium">{{ task.description }}</TableCell>
+              <TableCell class="font-mono text-sm">
+                {{ task.accommodation?.code || 'N/A' }}
+              </TableCell>
+              <TableCell>
+                <Badge :variant="getPriorityVariant(task.priority)">
+                  {{ translatePriority(task.priority) }}
+                </Badge>
+              </TableCell>
+              <TableCell class="text-red-600 dark:text-red-400 font-semibold">
+                {{ formatDate(task.due_date) }}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+
+    <!-- Tareas Recientes -->
+    <Card>
+      <CardHeader>
+        <div class="flex items-center justify-between">
+          <div>
+            <CardTitle>Tareas Recientes</CardTitle>
+            <CardDescription>Últimas 10 tareas registradas</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" @click="navigateToTasks">
+            Ver todas
             <ArrowRight class="ml-2 h-4 w-4" />
           </Button>
-        </CardContent>
-      </Card>
-
-      <!-- Tareas Recientes -->
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle>Tareas Recientes</CardTitle>
-              <CardDescription>Últimas tareas creadas en el sistema</CardDescription>
-            </div>
-            <Button size="sm" variant="outline" @click="navigateToTasks">
-              Ver Todas
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Alojamiento</TableHead>
-                <TableHead>Prioridad</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Vencimiento</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-if="recentTasks.length === 0">
-                <TableCell class="text-center text-muted-foreground" colspan="5">
-                  No hay tareas recientes
-                </TableCell>
-              </TableRow>
-              <TableRow
-                v-for="task in recentTasks"
-                :key="task.id"
-                class="cursor-pointer hover:bg-muted/50"
-                @click="navigateToTask(task.id)"
-              >
-                <TableCell class="font-medium">
-                  {{ task.description.substring(0, 50)
-                  }}{{ task.description.length > 50 ? '...' : '' }}
-                </TableCell>
-                <TableCell>
-                  {{ task.accommodation?.code || 'N/A' }}
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getPriorityVariant(task.priority)">
-                    {{ translatePriority(task.priority) }}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge :variant="getStatusVariant(task.status)">
-                    {{ translateStatus(task.status) }}
-                  </Badge>
-                </TableCell>
-                <TableCell class="text-muted-foreground">
-                  {{ new Date(task.due_date).toLocaleDateString('es-ES') }}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div v-if="recentTasks.length === 0" class="text-center py-8">
+          <p class="text-muted-foreground">No hay tareas registradas</p>
+        </div>
+        <Table v-else>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Descripción</TableHead>
+              <TableHead>Alojamiento</TableHead>
+              <TableHead>Prioridad</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Vencimiento</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow
+              v-for="task in recentTasks"
+              :key="task.id"
+              class="cursor-pointer hover:bg-muted/50"
+              @click="navigateToTask(task.id)"
+            >
+              <TableCell class="font-medium">{{ task.description }}</TableCell>
+              <TableCell class="font-mono text-sm">
+                {{ task.accommodation?.code || 'N/A' }}
+              </TableCell>
+              <TableCell>
+                <Badge :variant="getPriorityVariant(task.priority)">
+                  {{ translatePriority(task.priority) }}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge
+                  :class="getStatusClasses(task.status)"
+                  :variant="getStatusVariant(task.status)"
+                >
+                  {{ translateStatus(task.status) }}
+                </Badge>
+              </TableCell>
+              <TableCell>{{ formatDate(task.due_date) }}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   </div>
 </template>

@@ -40,68 +40,65 @@ const getStatIcon = (type: IconType): Component => {
 }
 
 /**
- * Obtiene el color según el tipo de estadística
+ * Obtiene las clases de color para el ícono según el tipo (adaptables al tema)
  */
-const getStatColor = (type: IconType): string => {
-  const colors: Record<IconType, string> = {
-    completed: 'text-green-600',
-    pending: 'text-blue-600',
-    overdue: 'text-red-600',
-    progress: 'text-purple-600',
-    accommodations: 'text-indigo-600',
-    cost: 'text-orange-600',
+const getIconClasses = (type: IconType): string => {
+  const classes: Record<IconType, string> = {
+    completed: 'text-green-600 dark:text-green-400',
+    pending: 'text-blue-600 dark:text-blue-400',
+    overdue: 'text-red-600 dark:text-red-400',
+    progress: 'text-purple-600 dark:text-purple-400',
+    accommodations: 'text-indigo-600 dark:text-indigo-400',
+    cost: 'text-amber-600 dark:text-amber-400',
   }
-  return colors[type]
+  return classes[type]
 }
 
 /**
- * Determina si mostrar badge de alerta en tareas vencidas
+ * Tasa de finalización formateada
  */
-const showOverdueAlert = computed((): boolean => {
-  return props.stats.overdueTasksCount > 0
+const completionRateFormatted = computed((): string => {
+  return `${props.stats.completionRate.toFixed(1)}%`
 })
 </script>
 
 <template>
   <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-    <!-- Total Tareas -->
+    <!-- Tareas Completadas -->
     <Card>
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Total Tareas</CardTitle>
-        <component :is="getStatIcon('progress')" :class="getStatColor('progress')" class="h-4 w-4" />
+        <CardTitle class="text-sm font-medium">Tareas Completadas</CardTitle>
+        <component
+          :is="getStatIcon('completed')"
+          :class="getIconClasses('completed')"
+          class="h-4 w-4"
+        />
       </CardHeader>
       <CardContent>
-        <div class="text-2xl font-bold">{{ stats.totalTasks }}</div>
-        <div class="flex items-center gap-2 mt-2">
-          <Badge class="text-xs" variant="secondary">
-            {{ stats.completedTasks }} completadas
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- Tasa de Completitud -->
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Completitud</CardTitle>
-        <component :is="getStatIcon('completed')" :class="getStatColor('completed')" class="h-4 w-4" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">{{ stats.completionRate }}%</div>
+        <div class="text-2xl font-bold">{{ stats.completedTasks }}</div>
+        <p class="text-xs text-muted-foreground">de {{ stats.totalTasks }} totales</p>
         <Progress :model-value="stats.completionRate" class="mt-2" />
+        <p class="text-xs text-muted-foreground mt-1">{{ completionRateFormatted }} completado</p>
       </CardContent>
     </Card>
 
     <!-- Tareas Pendientes -->
     <Card>
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Pendientes</CardTitle>
-        <component :is="getStatIcon('pending')" :class="getStatColor('pending')" class="h-4 w-4" />
+        <CardTitle class="text-sm font-medium">Tareas Pendientes</CardTitle>
+        <component
+          :is="getStatIcon('pending')"
+          :class="getIconClasses('pending')"
+          class="h-4 w-4"
+        />
       </CardHeader>
       <CardContent>
         <div class="text-2xl font-bold">{{ stats.pendingTasks }}</div>
+        <div class="flex items-center gap-2 mt-2">
+          <Badge variant="secondary">{{ stats.inProgressTasks }} en progreso</Badge>
+        </div>
         <p class="text-xs text-muted-foreground mt-2">
-          {{ stats.inProgressTasks }} en progreso
+          {{ stats.highPriorityTasks }} de alta prioridad
         </p>
       </CardContent>
     </Card>
@@ -109,76 +106,43 @@ const showOverdueAlert = computed((): boolean => {
     <!-- Tareas Vencidas -->
     <Card>
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Vencidas</CardTitle>
-        <component :is="getStatIcon('overdue')" :class="getStatColor('overdue')" class="h-4 w-4" />
+        <CardTitle class="text-sm font-medium">Tareas Vencidas</CardTitle>
+        <component
+          :is="getStatIcon('overdue')"
+          :class="getIconClasses('overdue')"
+          class="h-4 w-4"
+        />
       </CardHeader>
       <CardContent>
         <div class="text-2xl font-bold">{{ stats.overdueTasksCount }}</div>
+        <p class="text-xs text-muted-foreground">requieren atención inmediata</p>
+        <Badge v-if="stats.overdueTasksCount > 0" class="mt-2" variant="destructive">
+          Acción requerida
+        </Badge>
         <Badge
-          v-if="showOverdueAlert"
-          class="text-xs mt-2"
-          variant="destructive"
+          v-else
+          class="mt-2 border-green-600 text-green-600 dark:border-green-400 dark:text-green-400"
+          variant="outline"
         >
-          Requieren atención
+          Al día
         </Badge>
       </CardContent>
     </Card>
 
-    <!-- Alojamientos Activos -->
+    <!-- Costos Mensuales -->
     <Card>
       <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Alojamientos</CardTitle>
-        <component :is="getStatIcon('accommodations')" :class="getStatColor('accommodations')" class="h-4 w-4" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">{{ stats.activeAccommodations }}</div>
-        <p class="text-xs text-muted-foreground mt-2">
-          {{ stats.totalAccommodations }} total
-        </p>
-      </CardContent>
-    </Card>
-
-    <!-- Costo Mensual -->
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Costo Mensual</CardTitle>
-        <component :is="getStatIcon('cost')" :class="getStatColor('cost')" class="h-4 w-4" />
+        <CardTitle class="text-sm font-medium">Costos del Mes</CardTitle>
+        <component :is="getStatIcon('cost')" :class="getIconClasses('cost')" class="h-4 w-4" />
       </CardHeader>
       <CardContent>
         <div class="text-2xl font-bold">{{ formatCurrency(stats.monthlyCost) }}</div>
-        <p class="text-xs text-muted-foreground mt-2">
-          {{ formatCurrency(stats.averageCostPerTask) }}/tarea
+        <p class="text-xs text-muted-foreground">
+          Promedio: {{ formatCurrency(stats.averageCostPerTask) }} por tarea
         </p>
-      </CardContent>
-    </Card>
-
-    <!-- Prioridad Alta -->
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Alta Prioridad</CardTitle>
-        <AlertTriangle class="h-4 w-4 text-red-600" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">{{ stats.highPriorityTasks }}</div>
-        <p class="text-xs text-muted-foreground mt-2">
-          Requieren seguimiento
-        </p>
-      </CardContent>
-    </Card>
-
-    <!-- Placeholder Card (para mantener grid par) -->
-    <Card class="hidden lg:block">
-      <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle class="text-sm font-medium">Eficiencia</CardTitle>
-        <TrendingUp class="h-4 w-4 text-green-600" />
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold">
-          {{ stats.completedTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0 }}%
+        <div class="flex items-center gap-2 mt-2">
+          <Badge variant="outline">{{ stats.totalAccommodations }} alojamientos</Badge>
         </div>
-        <p class="text-xs text-muted-foreground mt-2">
-          Tareas completadas vs total
-        </p>
       </CardContent>
     </Card>
   </div>
