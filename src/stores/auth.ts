@@ -62,25 +62,34 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const checkAuth = async (): Promise<void> => {
     // Evitar múltiples llamadas simultáneas
-    if (isLoading.value) return
+    if (isLoading.value) {
+      console.log('checkAuth already in progress, skipping')
+      return
+    }
 
     isLoading.value = true
     clearError()
 
-    // Timeout de seguridad de 10 segundos
+    // Timeout reducido a 5 segundos
     const timeoutId = setTimeout(() => {
       if (isLoading.value) {
         console.warn('Auth check timeout - forcing loading to false')
         isLoading.value = false
-        setError('Tiempo de espera agotado al verificar autenticación')
+        // No setear error, solo forzar que se detenga el loading
       }
-    }, 10000)
+    }, 5000)
 
     try {
+      // Intentar obtener usuario con timeout propio
+      const userPromise = supabase.auth.getUser()
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('User fetch timeout')), 4000)
+      })
+
       const {
         data: { user },
         error: userError,
-      } = await supabase.auth.getUser()
+      } = await Promise.race([userPromise, timeoutPromise])
 
       if (userError || !user) {
         clearAuth()
@@ -100,7 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
         console.error('Profile not found. Trigger should have created it:', profileError)
         setError('Perfil de usuario no encontrado')
         clearAuth()
-        return // ✅ Ahora sí pasa por finally gracias al clearTimeout
+        return
       }
 
       if (profile) {
@@ -111,20 +120,25 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } catch (err: unknown) {
       console.error('Auth check error', err)
-      clearAuth()
-      setError((err as Error)?.message ?? 'Error desconocido')
+
+      // Si el error es por timeout, no limpiar auth (mantener sesión)
+      if ((err as Error)?.message !== 'User fetch timeout') {
+        clearAuth()
+        setError((err as Error)?.message ?? 'Error desconocido')
+      }
     } finally {
-      clearTimeout(timeoutId) // ✅ Limpiar timeout
-      isLoading.value = false // ✅ SIEMPRE se ejecuta
+      clearTimeout(timeoutId)
+      isLoading.value = false
     }
   }
 
   /**
-   * Inicializa el listener de auth state
+   * Inicializa el listener de auth state y visibilidad de página
    */
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
 
+    // Listener de cambios de autenticación
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
@@ -135,7 +149,32 @@ export const useAuthStore = defineStore('auth', () => {
       }
     })
 
-    return subscription.unsubscribe
+    // Listener de visibilidad de página
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible') {
+        // Cuando vuelves a la pestaña
+        console.log('Tab became visible, checking auth...')
+
+        // Si está cargando por más de 1 segundo, forzar reset
+        if (isLoading.value) {
+          console.log('Forcing loading reset on tab visibility')
+          isLoading.value = false
+        }
+
+        // Si hay sesión pero no está autenticado, reconectar
+        if (supabaseUser.value && !isLoading.value) {
+          checkAuth()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Retornar función de cleanup
+    return () => {
+      subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }
 
   return {
