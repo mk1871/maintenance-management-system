@@ -11,7 +11,6 @@ export const useAuthStore = defineStore('auth', () => {
   const userProfile = ref<UserProfile | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
-  const lastCheckTime = ref<number>(0) // ✅ NUEVO: timestamp del último check
 
   const isAuthenticated = computed(() => supabaseUser.value !== null && userProfile.value !== null)
   const role = computed(() => userProfile.value?.role ?? null)
@@ -57,36 +56,14 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Revisa sesión activa y carga perfil de usuario.
-   * Con prevención de llamadas múltiples simultáneas.
+   * Verifica sesión activa y carga perfil
    */
   const checkAuth = async (): Promise<void> => {
-    const now = Date.now()
-    const MIN_TIME_BETWEEN_CHECKS = 2000 // ✅ Mínimo 2 segundos entre checks
+    // Evitar llamadas simultáneas
+    if (isLoading.value) return
 
-    // ✅ PREVENCIÓN 1: Evitar si ya está cargando
-    if (isLoading.value) {
-      console.log('checkAuth already in progress, skipping')
-      return
-    }
-
-    // ✅ PREVENCIÓN 2: Evitar si se llamó hace menos de 2 segundos
-    if (now - lastCheckTime.value < MIN_TIME_BETWEEN_CHECKS) {
-      console.log('checkAuth called too soon, skipping')
-      return
-    }
-
-    lastCheckTime.value = now
     isLoading.value = true
-    clearError()
-
-    // Timeout de 5 segundos
-    const timeoutId = setTimeout(() => {
-      if (isLoading.value) {
-        console.warn('Auth check timeout - forcing loading to false')
-        isLoading.value = false
-      }
-    }, 5000)
+    error.value = null
 
     try {
       const {
@@ -101,57 +78,52 @@ export const useAuthStore = defineStore('auth', () => {
 
       setUser(user)
 
+      // Cargar perfil
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
-      if (profileError) {
-        console.error('Profile not found:', profileError)
-        setError('Perfil de usuario no encontrado')
+      if (profileError || !profile) {
+        console.error('Profile error:', profileError)
+        setError('Perfil no encontrado')
         clearAuth()
         return
       }
 
-      if (profile) {
-        setUserProfile(profile)
-      } else {
-        setError('Perfil de usuario no encontrado')
-        clearAuth()
-      }
+      setUserProfile(profile)
     } catch (err: unknown) {
       console.error('Auth check error:', err)
       clearAuth()
       setError((err as Error)?.message ?? 'Error desconocido')
     } finally {
-      clearTimeout(timeoutId)
       isLoading.value = false
     }
   }
 
   /**
-   * Inicializa el listener de auth state
-   * SIN listeners de visibilidad para evitar loops
+   * Inicializa listeners de autenticación
    */
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
 
+    // ✅ Listener filtrado para evitar loops
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+      console.log('Auth event:', event)
+
+      // Solo reaccionar a eventos específicos
+      if (event === 'SIGNED_IN') {
         await checkAuth()
       } else if (event === 'SIGNED_OUT') {
         clearAuth()
       }
+      // Ignorar: TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION
     })
 
-    // ✅ ELIMINADO: listeners de visibilidad que causaban el loop
-
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }
 
   return {

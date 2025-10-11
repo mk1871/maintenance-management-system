@@ -59,52 +59,41 @@ const router = createRouter({
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
-      component: () => import('@/views/NotFoundView.vue'),
-      meta: { requiresAuth: false },
+      redirect: '/',
     },
   ],
-  scrollBehavior(to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition
-    }
-    return { top: 0 }
-  },
 })
 
 /**
- * Navigation guard simplificado
+ * Navigation guard con manejo de autenticación
  */
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Si no requiere auth, continuar
+  // Rutas públicas
   if (!to.meta.requiresAuth) {
     if (to.meta.hideForAuth && authStore.isAuthenticated) {
-      return next({ name: 'Home', replace: true })
+      return next({ name: 'Home' })
     }
     return next()
   }
 
-  // ✅ Esperar máximo 3 segundos si está cargando
-  let attempts = 0
-  while (authStore.isLoading && attempts < 30) {
-    await new Promise((resolve) => setTimeout(resolve, 100))
-    attempts++
+  // Esperar si está cargando (máximo 3 segundos)
+  if (authStore.isLoading) {
+    let waited = 0
+    while (authStore.isLoading && waited < 3000) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      waited += 100
+    }
   }
 
-  // Si no hay usuario, verificar auth
-  if (!authStore.supabaseUser && !authStore.isLoading) {
-    await authStore.checkAuth()
-  }
-
-  // Decisión final
+  // ✅ Decisión con if/else explícito (no ternario)
   if (authStore.isAuthenticated) {
     next()
   } else {
     next({
       name: 'Login',
-      replace: true,
-      query: { redirect: to.fullPath },
+      query: { redirect: to.fullPath }
     })
   }
 })
