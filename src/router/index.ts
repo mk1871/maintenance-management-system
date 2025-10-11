@@ -1,3 +1,5 @@
+// src/router/index.ts
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -61,39 +63,63 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
   ],
+  // Scroll behavior para mejor UX en móviles
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+    if (to.hash) {
+      return { el: to.hash, behavior: 'smooth' }
+    }
+    return { top: 0 }
+  },
 })
 
 /**
- * Navigation guard con manejo correcto de auth state
+ * Navigation guard optimizado para móviles
  */
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // CORRECCIÓN 1: Si no requiere auth, permitir acceso directo
+  // Si la ruta no requiere autenticación
   if (!to.meta.requiresAuth) {
-    // Si está autenticado y va a login/register, redirigir a home
+    // Redirigir a Home si está autenticado y va a login/register
     if (to.meta.hideForAuth && authStore.isAuthenticated) {
       return next({ name: 'Home', replace: true })
     }
     return next()
   }
 
-  // CORRECCIÓN 2: Esperar a que termine de verificar auth si está cargando
+  // MEJORA MÓVILES: Timeout más agresivo (2 segundos en lugar de 3)
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  const maxWaitTime = isMobile ? 20 : 30 // 2s móvil, 3s desktop
+
+  // Esperar a que termine de cargar auth
   if (authStore.isLoading) {
-    // Esperar máximo 3 segundos
     let attempts = 0
-    while (authStore.isLoading && attempts < 30) {
+    while (authStore.isLoading && attempts < maxWaitTime) {
       await new Promise((resolve) => setTimeout(resolve, 100))
       attempts++
     }
+
+    // MEJORA MÓVILES: Forzar loading=false si se pasó el tiempo
+    if (authStore.isLoading) {
+      console.warn('Router: Forcing loading=false after timeout')
+      authStore.isLoading = false
+    }
   }
 
-  // CORRECCIÓN 3: Si no hay usuario después de cargar, verificar auth
+  // Si no hay usuario después de esperar, verificar auth
   if (!authStore.supabaseUser) {
-    await authStore.checkAuth()
+    try {
+      await authStore.checkAuth()
+    } catch (error: unknown) {
+      console.error('Router: Auth check failed', error)
+      // Continuar con la lógica normal en caso de error
+    }
   }
 
-  // CORRECCIÓN 4: Decidir basado en estado final
+  // Decisión final basada en estado de autenticación
   if (authStore.isAuthenticated) {
     next()
   } else {
@@ -102,6 +128,17 @@ router.beforeEach(async (to, from, next) => {
       replace: true,
       query: { redirect: to.fullPath },
     })
+  }
+})
+
+// MEJORA MÓVILES: Listener de errores de navegación
+router.onError((error) => {
+  console.error('Router error:', error)
+
+  // Si es error de chunk loading (común en móviles con red lenta)
+  if (error.message.includes('Failed to fetch dynamically imported module')) {
+    console.log('Reloading page due to chunk loading error')
+    window.location.reload()
   }
 })
 

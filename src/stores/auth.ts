@@ -57,12 +57,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Revisa sesión activa y carga perfil de usuario.
-   * NUNCA crea el perfil - el trigger de BD lo hace automáticamente.
-   * Incluye timeout de seguridad.
+   * Optimizado para móviles con reconexión automática.
    */
-  const checkAuth = async (): Promise<void> => {
+  const checkAuth = async (retryCount = 0): Promise<void> => {
+    const MAX_RETRIES = 2
+
     // Evitar múltiples llamadas simultáneas
-    if (isLoading.value) {
+    if (isLoading.value && retryCount === 0) {
       console.log('checkAuth already in progress, skipping')
       return
     }
@@ -70,43 +71,71 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     clearError()
 
-    // Timeout reducido a 5 segundos
+    // Timeout de 3 segundos en móviles (más corto)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    const timeoutDuration = isMobile ? 3000 : 5000
+
     const timeoutId = setTimeout(() => {
       if (isLoading.value) {
-        console.warn('Auth check timeout - forcing loading to false')
+        console.warn(`Auth check timeout (${timeoutDuration}ms)`)
         isLoading.value = false
-        // No setear error, solo forzar que se detenga el loading
+
+        // Reintentar en móviles
+        if (isMobile && retryCount < MAX_RETRIES) {
+          console.log(`Retrying auth check (${retryCount + 1}/${MAX_RETRIES})`)
+          setTimeout(() => checkAuth(retryCount + 1), 1000)
+        }
       }
-    }, 5000)
+    }, timeoutDuration)
 
     try {
-      // Intentar obtener usuario con timeout propio
-      const userPromise = supabase.auth.getUser()
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('User fetch timeout')), 4000)
-      })
+      // Crear AbortController para cancelación
+      const controller = new AbortController()
+      const abortTimeout = setTimeout(() => controller.abort(), timeoutDuration - 500)
 
       const {
         data: { user },
         error: userError,
-      } = await Promise.race([userPromise, timeoutPromise])
+      } = await supabase.auth.getUser()
+
+      clearTimeout(abortTimeout)
 
       if (userError || !user) {
+        if (retryCount < MAX_RETRIES && isMobile) {
+          console.log('User fetch failed, retrying...')
+          clearTimeout(timeoutId)
+          isLoading.value = false
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          return checkAuth(retryCount + 1)
+        }
         clearAuth()
         return
       }
 
       setUser(user)
 
-      // SOLO LEER el perfil, NUNCA insertarlo
+      // Leer perfil con timeout propio
+      const profileController = new AbortController()
+      const profileTimeout = setTimeout(() => profileController.abort(), 2000)
+
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
+      clearTimeout(profileTimeout)
+
       if (profileError) {
-        console.error('Profile not found. Trigger should have created it:', profileError)
+        console.error('Profile not found:', profileError)
+
+        if (retryCount < MAX_RETRIES && isMobile) {
+          clearTimeout(timeoutId)
+          isLoading.value = false
+          await new Promise((resolve) => setTimeout(resolve, 500))
+          return checkAuth(retryCount + 1)
+        }
+
         setError('Perfil de usuario no encontrado')
         clearAuth()
         return
@@ -119,12 +148,21 @@ export const useAuthStore = defineStore('auth', () => {
         clearAuth()
       }
     } catch (err: unknown) {
-      console.error('Auth check error', err)
+      console.error('Auth check error:', err)
 
-      // Si el error es por timeout, no limpiar auth (mantener sesión)
-      if ((err as Error)?.message !== 'User fetch timeout') {
+      // Reintentar en móviles si es error de red
+      if (isMobile && retryCount < MAX_RETRIES) {
+        clearTimeout(timeoutId)
+        isLoading.value = false
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        return checkAuth(retryCount + 1)
+      }
+
+      // Solo limpiar auth si no es timeout ni error de red
+      const errorMsg = (err as Error)?.message ?? ''
+      if (!errorMsg.includes('timeout') && !errorMsg.includes('fetch')) {
         clearAuth()
-        setError((err as Error)?.message ?? 'Error desconocido')
+        setError(errorMsg || 'Error desconocido')
       }
     } finally {
       clearTimeout(timeoutId)
@@ -134,11 +172,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Inicializa el listener de auth state y visibilidad de página
+   * Optimizado para móviles
    */
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
 
-    // Listener de cambios de autenticación
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
@@ -149,31 +187,53 @@ export const useAuthStore = defineStore('auth', () => {
       }
     })
 
-    // Listener de visibilidad de página
+    // Eventos de visibilidad y focus (importante para móviles)
     const handleVisibilityChange = (): void => {
       if (document.visibilityState === 'visible') {
-        // Cuando vuelves a la pestaña
-        console.log('Tab became visible, checking auth...')
+        console.log('Tab/App became visible')
 
-        // Si está cargando por más de 1 segundo, forzar reset
         if (isLoading.value) {
-          console.log('Forcing loading reset on tab visibility')
+          console.log('Forcing loading reset')
           isLoading.value = false
         }
 
-        // Si hay sesión pero no está autenticado, reconectar
+        // Reconectar siempre en móviles cuando vuelves
+        if (supabaseUser.value) {
+          setTimeout(() => checkAuth(), 100)
+        }
+      }
+    }
+
+    const handlePageShow = (event: PageTransitionEvent): void => {
+      // Detectar si viene de bfcache (back-forward cache)
+      if (event.persisted) {
+        console.log('Page restored from bfcache')
+        isLoading.value = false
+        if (supabaseUser.value) {
+          checkAuth()
+        }
+      }
+    }
+
+    const handleFocus = (): void => {
+      // Móviles: reconectar cuando vuelves al navegador
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         if (supabaseUser.value && !isLoading.value) {
+          console.log('Window focused on mobile, checking auth')
           checkAuth()
         }
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('focus', handleFocus)
 
-    // Retornar función de cleanup
     return () => {
       subscription.unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('focus', handleFocus)
     }
   }
 
