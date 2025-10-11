@@ -1,3 +1,5 @@
+// src/stores/auth.ts
+
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { User } from '@supabase/supabase-js'
@@ -15,36 +17,64 @@ export const useAuthStore = defineStore('auth', () => {
   const fullName = computed(() => userProfile.value?.full_name)
   const userId = computed(() => supabaseUser.value?.id ?? null)
 
-  const setUser = (user: User | null) => {
+  /**
+   * Establece el usuario de Supabase
+   */
+  const setUser = (user: User | null): void => {
     supabaseUser.value = user
   }
 
-  const setUserProfile = (profile: UserProfile | null) => {
+  /**
+   * Establece el perfil del usuario
+   */
+  const setUserProfile = (profile: UserProfile | null): void => {
     userProfile.value = profile
     if (profile) error.value = null
   }
 
-  const setError = (errorMessage: string | null) => {
+  /**
+   * Establece un mensaje de error
+   */
+  const setError = (errorMessage: string | null): void => {
     error.value = errorMessage
   }
 
-  const clearAuth = () => {
+  /**
+   * Limpia toda la autenticación
+   */
+  const clearAuth = (): void => {
     supabaseUser.value = null
     userProfile.value = null
     error.value = null
   }
 
-  const clearError = () => {
+  /**
+   * Limpia solo el error
+   */
+  const clearError = (): void => {
     error.value = null
   }
 
   /**
    * Revisa sesión activa y carga perfil de usuario.
    * NUNCA crea el perfil - el trigger de BD lo hace automáticamente.
+   * Incluye timeout de seguridad.
    */
   const checkAuth = async (): Promise<void> => {
+    // Evitar múltiples llamadas simultáneas
     if (isLoading.value) return
+
     isLoading.value = true
+    clearError()
+
+    // Timeout de seguridad de 10 segundos
+    const timeoutId = setTimeout(() => {
+      if (isLoading.value) {
+        console.warn('Auth check timeout - forcing loading to false')
+        isLoading.value = false
+        setError('Tiempo de espera agotado al verificar autenticación')
+      }
+    }, 10000)
 
     try {
       const {
@@ -70,7 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
         console.error('Profile not found. Trigger should have created it:', profileError)
         setError('Perfil de usuario no encontrado')
         clearAuth()
-        return
+        return // ✅ Ahora sí pasa por finally gracias al clearTimeout
       }
 
       if (profile) {
@@ -84,7 +114,8 @@ export const useAuthStore = defineStore('auth', () => {
       clearAuth()
       setError((err as Error)?.message ?? 'Error desconocido')
     } finally {
-      isLoading.value = false
+      clearTimeout(timeoutId) // ✅ Limpiar timeout
+      isLoading.value = false // ✅ SIEMPRE se ejecuta
     }
   }
 
@@ -93,6 +124,7 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
@@ -102,6 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
         clearAuth()
       }
     })
+
     return subscription.unsubscribe
   }
 
