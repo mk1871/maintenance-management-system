@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, Eye, CheckCircle } from 'lucide-vue-next'
+import { MoreHorizontal, CheckCircle, Trash2 } from 'lucide-vue-next'
 
 import type { TaskWithRelations } from '@/composables/taskService'
 
@@ -28,7 +28,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'view-detail', taskId: string): void
   (e: 'complete', taskId: string): void
   (e: 'delete', taskId: string): void
 }>()
@@ -194,10 +193,6 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click.stop="emit('view-detail', task.id)">
-                    <Eye class="mr-2 h-4 w-4" />
-                    Ver detalles
-                  </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="canComplete(task)"
                     @click.stop="emit('complete', task.id)"
@@ -205,11 +200,12 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
                     <CheckCircle class="mr-2 h-4 w-4" />
                     Marcar completada
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator v-if="canComplete(task)" />
                   <DropdownMenuItem
-                    class="text-destructive"
+                    class="text-destructive focus:text-destructive"
                     @click.stop="emit('delete', task.id)"
                   >
+                    <Trash2 class="mr-2 h-4 w-4" />
                     Eliminar
                   </DropdownMenuItem>
                 </DropdownMenuContent>
