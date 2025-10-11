@@ -243,6 +243,27 @@ export const taskService = {
   },
 
   /**
+   * Obtiene todas las tareas de un alojamiento específico
+   */
+  async getByAccommodationId(accommodationId: string): Promise<TaskWithRelations[]> {
+    if (!accommodationId || accommodationId.trim().length === 0) {
+      throw new Error('El ID del alojamiento es requerido')
+    }
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .select(TASK_SELECT_QUERY)
+      .eq('accommodation_id', accommodationId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw new Error(getErrorMessage(error, 'obtener tareas del alojamiento'))
+    }
+
+    return (data as Task[]).map(transformTaskWithLabels)
+  },
+
+  /**
    * Crea una nueva tarea
    */
   async create(taskData: CreateTaskData): Promise<TaskWithRelations> {
@@ -269,7 +290,7 @@ export const taskService = {
       estimated_cost: taskData.estimated_cost,
       assigned_to: taskData.assigned_to,
       detection_date: getCurrentTimestamp(),
-      created_by: user.id, // ✅ Usuario autenticado
+      created_by: user.id,
     }
 
     const { data, error } = await supabase

@@ -39,7 +39,20 @@ import type {
   AccommodationElement,
 } from '@/composables/accommodationAreaService'
 
+// Props
+const props = withDefaults(
+  defineProps<{
+    isOpen?: boolean
+    defaultAccommodationId?: string
+  }>(),
+  {
+    isOpen: undefined, // ✅ Cambiar a undefined para detectar cuando NO se pasa
+    defaultAccommodationId: '',
+  },
+)
+
 const emit = defineEmits<{
+  (e: 'close'): void
   (e: 'task-created'): void
 }>()
 
@@ -65,7 +78,7 @@ interface FormErrors {
 const { getAreasByAccommodation } = useAccommodationAreaService()
 
 const formData = ref<FormData>({
-  accommodation_id: '',
+  accommodation_id: props.defaultAccommodationId || '',
   accommodation_area_id: '',
   accommodation_element_id: '',
   description: '',
@@ -85,10 +98,35 @@ const errors = ref<FormErrors>({
 
 const accommodations = ref<Accommodation[]>([])
 const configuredAreas = ref<AccommodationArea[]>([])
-const isDialogOpen = ref(false)
 const isLoadingAreas = ref(false)
 const isSubmitting = ref(false)
 const isDatePickerOpen = ref(false)
+
+// ✅ Estado interno del dialog (solo se usa si no viene isOpen como prop)
+const internalDialogOpen = ref(false)
+
+// ✅ Computed para el estado del dialog
+const showTaskForm = computed({
+  get: () => {
+    // Si isOpen es undefined, usar estado interno (modo standalone)
+    if (props.isOpen === undefined) {
+      return internalDialogOpen.value
+    }
+    // Si isOpen tiene valor, usarlo (modo controlado)
+    return props.isOpen
+  },
+  set: (value: boolean) => {
+    if (props.isOpen === undefined) {
+      // Modo standalone: actualizar estado interno
+      internalDialogOpen.value = value
+    } else {
+      // Modo controlado: emitir evento
+      if (!value) {
+        emit('close')
+      }
+    }
+  },
+})
 
 const df = new DateFormatter('es-ES', {
   dateStyle: 'long',
@@ -226,7 +264,7 @@ const validateForm = (): boolean => {
 
 const resetForm = (): void => {
   formData.value = {
-    accommodation_id: '',
+    accommodation_id: props.defaultAccommodationId || '',
     accommodation_area_id: '',
     accommodation_element_id: '',
     description: '',
@@ -269,8 +307,9 @@ const handleSubmit = async (): Promise<void> => {
 
     toast.success('Tarea creada exitosamente')
     emit('task-created')
+    emit('close')
     resetForm()
-    isDialogOpen.value = false
+    showTaskForm.value = false // ✅ Cerrar dialog en ambos modos
   } catch (error: unknown) {
     console.error(error)
     toast.error((error as Error).message || 'Error al crear la tarea')
@@ -279,6 +318,17 @@ const handleSubmit = async (): Promise<void> => {
   }
 }
 
+const handleDialogClose = (open: boolean): void => {
+  if (!open) {
+    if (props.isOpen !== undefined) {
+      emit('close')
+    } else {
+      internalDialogOpen.value = false
+    }
+  }
+}
+
+// Watch para cargar áreas cuando cambia el alojamiento
 watch(
   () => formData.value.accommodation_id,
   async (newId) => {
@@ -292,6 +342,7 @@ watch(
   },
 )
 
+// Watch para resetear elemento cuando cambia el área
 watch(
   () => formData.value.accommodation_area_id,
   () => {
@@ -299,20 +350,46 @@ watch(
   },
 )
 
-watch(isDialogOpen, (isOpen) => {
-  if (isOpen) {
-    resetForm()
-  }
-})
+// Watch para cargar áreas si defaultAccommodationId cambia
+watch(
+  () => props.defaultAccommodationId,
+  async (newValue) => {
+    if (newValue) {
+      formData.value.accommodation_id = newValue
+      await loadConfiguredAreas(newValue)
+    }
+  },
+  { immediate: true },
+)
+
+// Watch para resetear form cuando se abre el dialog
+watch(
+  () => showTaskForm.value,
+  (isOpen) => {
+    if (isOpen) {
+      resetForm()
+      if (props.defaultAccommodationId) {
+        formData.value.accommodation_id = props.defaultAccommodationId
+        loadConfiguredAreas(props.defaultAccommodationId)
+      }
+    }
+  },
+)
 
 onMounted(async () => {
   await loadAccommodations()
+
+  // Si hay defaultAccommodationId, cargar las áreas
+  if (props.defaultAccommodationId) {
+    await loadConfiguredAreas(props.defaultAccommodationId)
+  }
 })
 </script>
 
 <template>
-  <Dialog v-model:open="isDialogOpen">
-    <DialogTrigger as-child>
+  <Dialog v-model:open="showTaskForm" @update:open="handleDialogClose">
+    <!-- Solo mostrar trigger si NO viene isOpen como prop -->
+    <DialogTrigger v-if="!isOpen" as-child>
       <Button>Nueva Tarea</Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
@@ -484,7 +561,7 @@ onMounted(async () => {
       </div>
 
       <DialogFooter class="gap-2">
-        <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancelar </Button>
+        <Button type="button" variant="outline" @click="showTaskForm = false"> Cancelar </Button>
         <Button :disabled="isSubmitting" @click="handleSubmit">
           <Spinner v-if="isSubmitting" class="h-4 w-4 mr-2" />
           {{ isSubmitting ? 'Creando...' : 'Crear Tarea' }}

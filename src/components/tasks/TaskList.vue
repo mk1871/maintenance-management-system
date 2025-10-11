@@ -43,14 +43,25 @@ const getPriorityVariant = (priority: string): 'default' | 'destructive' | 'seco
   return variants[priority] ?? 'default'
 }
 
-const getStatusVariant = (status: string): 'default' | 'outline' | 'secondary' => {
-  const variants: Record<string, 'default' | 'outline' | 'secondary'> = {
-    pending: 'secondary',
-    in_progress: 'default',
-    completed: 'outline',
-    cancelled: 'secondary',
+const getStatusVariant = (status: string): 'default' | 'outline' | 'secondary' | 'destructive' => {
+  const variants: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
+    pending: 'secondary', // Gris
+    in_progress: 'default', // Azul del tema
+    completed: 'outline', // Verde - usando outline + clase semantic
+    cancelled: 'destructive', // Rojo
   }
   return variants[status] ?? 'secondary'
+}
+
+/**
+ * Obtiene clases adicionales para el badge de estado
+ */
+const getStatusClasses = (status: string): string => {
+  if (status === 'completed') {
+    // Clase que usa variables CSS del tema
+    return 'border-green-600 text-green-600 dark:border-green-400 dark:text-green-400'
+  }
+  return ''
 }
 
 const translatePriority = (priority: string): string => {
@@ -178,7 +189,10 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge :variant="getStatusVariant(task.status)">
+              <Badge
+                :class="getStatusClasses(task.status)"
+                :variant="getStatusVariant(task.status)"
+              >
                 {{ translateStatus(task.status) }}
               </Badge>
             </TableCell>

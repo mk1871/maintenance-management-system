@@ -1,20 +1,26 @@
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { Separator } from '@/components/ui/separator'
 
 import AccommodationList from '@/components/accommodations/AccommodationList.vue'
 import AccommodationForm from '@/components/accommodations/AccommodationForm.vue'
+import AccommodationEditDialog from '@/components/accommodations/AccommodationEditDialog.vue'
 
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 import { useAccommodationForm } from '@/composables/useAccommodationForm'
 
 // Composables
+const route = useRoute()
+const router = useRouter()
 const { handleApiError } = useAccommodationForm()
 
 // State
 const accommodations = ref<Accommodation[]>([])
 const isLoading = ref(true)
+const selectedAccommodation = ref<Accommodation | null>(null)
+const showEditDialog = ref(false)
 
 /**
  * Estadísticas calculadas
@@ -67,8 +73,25 @@ const handleAccommodationCreated = (): void => {
  * Maneja el evento de edición
  */
 const handleEdit = (accommodation: Accommodation): void => {
-  toast.info(`Edición de ${accommodation.code} próximamente`)
-  // TODO: Implementar AccommodationEditDialog
+  selectedAccommodation.value = accommodation
+  showEditDialog.value = true
+}
+
+/**
+ * Cierra el dialog de edición
+ */
+const closeEditDialog = (): void => {
+  showEditDialog.value = false
+  selectedAccommodation.value = null
+}
+
+/**
+ * Maneja la actualización exitosa de un accommodation
+ */
+const handleAccommodationUpdated = (): void => {
+  closeEditDialog()
+  loadAccommodations()
+  toast.success('Alojamiento actualizado exitosamente')
 }
 
 /**
@@ -78,9 +101,41 @@ const handleRefresh = (): void => {
   loadAccommodations()
 }
 
+/**
+ * Maneja query params para abrir edición desde otras vistas
+ */
+const handleQueryParams = async (): Promise<void> => {
+  const editId = route.query.edit as string
+
+  if (editId) {
+    try {
+      const accommodation = await accommodationService.getById(editId)
+      if (accommodation) {
+        handleEdit(accommodation)
+        // Limpiar query param
+        router.replace({ name: 'Accommodations' })
+      }
+    } catch (error: unknown) {
+      console.error(error)
+      toast.error('No se pudo cargar el alojamiento para editar')
+    }
+  }
+}
+
+// Watch route query para detectar edición desde otras vistas
+watch(
+  () => route.query.edit,
+  (editId) => {
+    if (editId && accommodations.value.length > 0) {
+      handleQueryParams()
+    }
+  },
+)
+
 // Lifecycle
 onMounted(async () => {
   await loadAccommodations()
+  await handleQueryParams()
 })
 </script>
 
@@ -90,9 +145,7 @@ onMounted(async () => {
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
         <h1 class="text-3xl font-bold">Alojamientos</h1>
-        <p class="text-muted-foreground">
-          Gestiona todos los alojamientos del sistema
-        </p>
+        <p class="text-muted-foreground">Gestiona todos los alojamientos del sistema</p>
       </div>
 
       <!-- Estadísticas Compactas -->
@@ -133,5 +186,15 @@ onMounted(async () => {
       @edit="handleEdit"
       @refresh="handleRefresh"
     />
+
+    <!-- Dialog de Edición -->
+    <AccommodationEditDialog
+      v-if="selectedAccommodation"
+      :accommodation="selectedAccommodation"
+      :open="showEditDialog"
+      @updated="handleAccommodationUpdated"
+      @update:open="(value) => showEditDialog = value"
+    />
+
   </div>
 </template>
