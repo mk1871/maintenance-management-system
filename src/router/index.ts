@@ -63,63 +63,41 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
   ],
-  // Scroll behavior para mejor UX en móviles
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) {
       return savedPosition
-    }
-    if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
     }
     return { top: 0 }
   },
 })
 
 /**
- * Navigation guard optimizado para móviles
+ * Navigation guard simplificado
  */
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Si la ruta no requiere autenticación
+  // Si no requiere auth, continuar
   if (!to.meta.requiresAuth) {
-    // Redirigir a Home si está autenticado y va a login/register
     if (to.meta.hideForAuth && authStore.isAuthenticated) {
       return next({ name: 'Home', replace: true })
     }
     return next()
   }
 
-  // MEJORA MÓVILES: Timeout más agresivo (2 segundos en lugar de 3)
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-  const maxWaitTime = isMobile ? 20 : 30 // 2s móvil, 3s desktop
-
-  // Esperar a que termine de cargar auth
-  if (authStore.isLoading) {
-    let attempts = 0
-    while (authStore.isLoading && attempts < maxWaitTime) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      attempts++
-    }
-
-    // MEJORA MÓVILES: Forzar loading=false si se pasó el tiempo
-    if (authStore.isLoading) {
-      console.warn('Router: Forcing loading=false after timeout')
-      authStore.isLoading = false
-    }
+  // ✅ Esperar máximo 3 segundos si está cargando
+  let attempts = 0
+  while (authStore.isLoading && attempts < 30) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    attempts++
   }
 
-  // Si no hay usuario después de esperar, verificar auth
-  if (!authStore.supabaseUser) {
-    try {
-      await authStore.checkAuth()
-    } catch (error: unknown) {
-      console.error('Router: Auth check failed', error)
-      // Continuar con la lógica normal en caso de error
-    }
+  // Si no hay usuario, verificar auth
+  if (!authStore.supabaseUser && !authStore.isLoading) {
+    await authStore.checkAuth()
   }
 
-  // Decisión final basada en estado de autenticación
+  // Decisión final
   if (authStore.isAuthenticated) {
     next()
   } else {
@@ -128,17 +106,6 @@ router.beforeEach(async (to, from, next) => {
       replace: true,
       query: { redirect: to.fullPath },
     })
-  }
-})
-
-// MEJORA MÓVILES: Listener de errores de navegación
-router.onError((error) => {
-  console.error('Router error:', error)
-
-  // Si es error de chunk loading (común en móviles con red lenta)
-  if (error.message.includes('Failed to fetch dynamically imported module')) {
-    console.log('Reloading page due to chunk loading error')
-    window.location.reload()
   }
 })
 
