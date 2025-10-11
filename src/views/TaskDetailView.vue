@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-
+import TaskEditDialog from '@/components/tasks/TaskEditDialog.vue'
 import { taskService, type TaskWithRelations } from '@/composables/taskService'
 import { costService, type CreateCostData, type Cost } from '@/composables/costService'
 
@@ -141,14 +141,24 @@ const formatStatus = (status: string): string => {
 /**
  * Variante de badge para estado
  */
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'outline' => {
-  const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
-    pending: 'outline',
+const getStatusVariant = (status: string): 'default' | 'outline' | 'secondary' | 'destructive' => {
+  const variants: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
+    pending: 'secondary',
     in_progress: 'default',
-    completed: 'secondary',
-    cancelled: 'outline',
+    completed: 'outline',
+    cancelled: 'destructive',
   }
-  return variants[status] ?? 'default'
+  return variants[status] ?? 'secondary'
+}
+
+/**
+ * Obtiene clases adicionales para badge de estado (solo para completed)
+ */
+const getStatusClasses = (status: string): string => {
+  if (status === 'completed') {
+    return 'border-green-600 text-green-600 dark:border-green-400 dark:text-green-400'
+  }
+  return ''
 }
 
 /**
@@ -300,6 +310,13 @@ const goBack = (): void => {
   router.push('/tasks')
 }
 
+/**
+ * Maneja la actualización de la tarea y recarga los datos
+ */
+const handleTaskUpdated = async (): Promise<void> => {
+  await loadTaskData()
+}
+
 onMounted(async () => {
   await loadTaskData()
 })
@@ -344,10 +361,13 @@ onMounted(async () => {
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <!-- Botón Editar Tarea -->
+          <TaskEditDialog v-if="task" :task="task" @updated="handleTaskUpdated" />
+
           <Badge :variant="getPriorityVariant(task.priority)">
             {{ formatPriority(task.priority) }}
           </Badge>
-          <Badge :variant="getStatusVariant(task.status)">
+          <Badge :class="getStatusClasses(task.status)" :variant="getStatusVariant(task.status)">
             {{ formatStatus(task.status) }}
           </Badge>
         </div>

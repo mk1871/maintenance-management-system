@@ -97,6 +97,10 @@ export interface CreateTaskData {
 export interface UpdateTaskData {
   id: string
   status?: TaskStatus
+  description?: string
+  priority?: TaskPriority
+  due_date?: string
+  estimated_cost?: number
   accommodation_area_id?: string
   accommodation_element_id?: string
   repairer_name?: string
