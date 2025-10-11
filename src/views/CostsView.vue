@@ -41,6 +41,13 @@ import { cn } from '@/lib/utils'
 
 import { costService, type Cost } from '@/composables/costService'
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
+import {
+  exportToCSV,
+  exportToPDF,
+  formatDateForExport,
+  formatCurrencyForExport,
+  generateFilename,
+} from '@/lib/exportUtils'
 
 const router = useRouter()
 
@@ -261,17 +268,75 @@ const viewTask = (taskId: string): void => {
 }
 
 /**
- * Exporta datos a Excel
+ * Exporta los costos filtrados a CSV
  */
-const exportToExcel = (): void => {
-  toast.info('Función de exportar a Excel en desarrollo')
+const handleExportCSV = (): void => {
+  try {
+    if (filteredCosts.value.length === 0) {
+      toast.error('No hay datos para exportar')
+      return
+    }
+
+    const exportData = filteredCosts.value.map((cost) => ({
+      fecha: formatDateForExport(cost.expense_date),
+      alojamiento: getAccommodationCode(cost.accommodation_id),
+      tarea: cost.task_id.substring(0, 8),
+      descripcion: cost.description || 'Sin descripción',
+      cantidad: formatCurrencyForExport(cost.amount),
+      categoria: formatCostCategory(cost.category),
+    }))
+
+    const headers = {
+      fecha: 'Fecha',
+      alojamiento: 'Alojamiento',
+      tarea: 'Tarea ID',
+      descripcion: 'Descripción',
+      cantidad: 'Cantidad (€)',
+      categoria: 'Categoría',
+    }
+
+    const filename = generateFilename('costos')
+    exportToCSV(exportData, filename, headers)
+
+    toast.success('CSV exportado exitosamente')
+  } catch (error: unknown) {
+    console.error(error)
+    toast.error('Error al exportar CSV')
+  }
 }
 
 /**
- * Exporta datos a PDF
+ * Exporta los costos filtrados a PDF
  */
-const exportToPDF = (): void => {
-  toast.info('Función de exportar a PDF en desarrollo')
+const handleExportPDF = (): void => {
+  try {
+    if (filteredCosts.value.length === 0) {
+      toast.error('No hay datos para exportar')
+      return
+    }
+
+    const exportData = filteredCosts.value.map((cost) => ({
+      fecha: formatDateForExport(cost.expense_date),
+      alojamiento: getAccommodationCode(cost.accommodation_id),
+      tarea: cost.task_id.substring(0, 8),
+      descripcion: cost.description || 'Sin descripción',
+      cantidad: `€${formatCurrencyForExport(cost.amount)}`,
+      categoria: formatCostCategory(cost.category),
+    }))
+
+    const headers = ['Fecha', 'Alojamiento', 'Tarea', 'Descripción', 'Cantidad', 'Categoría']
+    const columns = ['fecha', 'alojamiento', 'tarea', 'descripcion', 'cantidad', 'categoria']
+    const title = 'Reporte de Costos'
+    const subtitle = `Total de registros: ${filteredCosts.value.length}`
+    const filename = generateFilename('costos')
+
+    exportToPDF(exportData, filename, title, headers, columns, filteredTotal.value, subtitle)
+
+    toast.success('PDF exportado exitosamente')
+  } catch (error: unknown) {
+    console.error(error)
+    toast.error('Error al exportar PDF')
+  }
 }
 
 onMounted(async () => {
@@ -293,11 +358,11 @@ onMounted(async () => {
         <Button :disabled="isRefreshing" size="icon" variant="outline" @click="handleRefresh">
           <RefreshCw :class="{ 'animate-spin': isRefreshing }" class="h-4 w-4" />
         </Button>
-        <Button variant="outline" @click="exportToExcel">
+        <Button variant="outline" @click="handleExportCSV">
           <FileSpreadsheet class="h-4 w-4 mr-2" />
-          Excel
+          CSV
         </Button>
-        <Button variant="outline" @click="exportToPDF">
+        <Button variant="outline" @click="handleExportPDF">
           <FileText class="h-4 w-4 mr-2" />
           PDF
         </Button>
