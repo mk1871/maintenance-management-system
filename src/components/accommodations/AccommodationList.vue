@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MoreHorizontal, Search, Eye, Trash2 } from 'lucide-vue-next'
+import { MoreHorizontal, Search, Edit, Trash2 } from 'lucide-vue-next'
 
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 import { useAccommodationForm } from '@/composables/useAccommodationForm'
@@ -123,9 +123,17 @@ const navigateToDetail = (accommodationId: string): void => {
 }
 
 /**
- * Abre el dialog de edición
+ * Maneja el click en la fila
  */
-const openEditDialog = (accommodation: Accommodation): void => {
+const handleRowClick = (accommodationId: string): void => {
+  navigateToDetail(accommodationId)
+}
+
+/**
+ * Abre el dialog de edición (previene propagación del click)
+ */
+const openEditDialog = (accommodation: Accommodation, event: Event): void => {
+  event.stopPropagation()
   emit('edit', accommodation)
 }
 
@@ -234,7 +242,8 @@ const formatDate = (dateString: string): string => {
           <TableRow
             v-for="accommodation in filteredAccommodations"
             :key="accommodation.id"
-            class="hover:bg-muted/50"
+            class="cursor-pointer hover:bg-muted/50"
+            @click="handleRowClick(accommodation.id)"
           >
             <TableCell class="font-medium">
               {{ accommodation.code }}
@@ -253,23 +262,20 @@ const formatDate = (dateString: string): string => {
             </TableCell>
             <TableCell>
               <DropdownMenu>
-                <DropdownMenuTrigger as-child>
+                <DropdownMenuTrigger as-child @click.stop="">
                   <Button class="h-8 w-8" size="icon" variant="ghost">
                     <MoreHorizontal class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem @click="navigateToDetail(accommodation.id)">
-                    <Eye class="mr-2 h-4 w-4" />
-                    Ver detalles
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @click="openEditDialog(accommodation)">
+                  <DropdownMenuItem @click.stop="openEditDialog(accommodation, $event)">
+                    <Edit class="mr-2 h-4 w-4" />
                     Editar
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     class="text-destructive focus:text-destructive"
-                    @click="openDeleteDialog(accommodation)"
+                    @click.stop="openDeleteDialog(accommodation)"
                   >
                     <Trash2 class="mr-2 h-4 w-4" />
                     Eliminar
