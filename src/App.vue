@@ -24,10 +24,12 @@ onMounted(() => {
   <div id="app" class="h-screen bg-background text-foreground">
     <Toaster position="bottom-right" />
 
+    <!-- Spinner mientras carga -->
     <div v-if="authStore.isLoading" class="h-screen flex items-center justify-center">
       <Spinner class="h-12 w-12" />
     </div>
 
+    <!-- Error de autenticación -->
     <div v-else-if="authStore.error" class="h-screen flex items-center justify-center">
       <div class="text-center p-8">
         <h2 class="text-2xl font-bold mb-4">Error de Autenticación</h2>
@@ -36,6 +38,7 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Layout principal -->
     <DefaultLayout v-else>
       <router-view />
     </DefaultLayout>

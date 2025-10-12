@@ -60,14 +60,43 @@ const router = createRouter({
 
 router.beforeEach(async (to, _, next) => {
   const authStore = useAuthStore()
+
+  // Rutas públicas
   if (!to.meta.requiresAuth) {
-    if (to.meta.hideForAuth && authStore.isAuthenticated) next({ name: 'Home' })
-    else next()
+    if (to.meta.hideForAuth && authStore.isAuthenticated) {
+      next({ name: 'Home' })
+    } else {
+      next()
+    }
     return
   }
-  if (!authStore.isAuthenticated) await authStore.checkAuth()
-  if (authStore.isAuthenticated) next()
-  else next({ name: 'Login', query: { redirect: to.fullPath } })
+
+  // ✅ SI YA ESTÁ AUTENTICADO, CONTINUAR SIN HACER NADA
+  if (authStore.isAuthenticated) {
+    next()
+    return
+  }
+
+  // ✅ SI ESTÁ CARGANDO, ESPERAR
+  if (authStore.isLoading) {
+    let attempts = 0
+    while (authStore.isLoading && attempts < 30) {
+      await new Promise((r) => setTimeout(r, 100))
+      attempts++
+    }
+  }
+
+  // ✅ SI NO ESTÁ AUTENTICADO Y NO ESTÁ CARGANDO, VERIFICAR
+  if (!authStore.isAuthenticated && !authStore.isLoading) {
+    await authStore.checkAuth()
+  }
+
+  // Decisión final
+  if (authStore.isAuthenticated) {
+    next()
+  } else {
+    next({ name: 'Login', query: { redirect: to.fullPath } })
+  }
 })
 
 export default router
