@@ -46,50 +46,35 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const checkAuth = async (): Promise<void> => {
     if (isLoading.value) return
-
     isLoading.value = true
-
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser()
-
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError || !user) {
         clearAuth()
         return
       }
-
       setUser(user)
 
-      // SOLO LEER el perfil, NUNCA insertarlo
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
 
-      if (profileError) {
-        console.error('Profile not found. Trigger should have created it:', profileError)
+      if (profileError || !profile) {
         setError('Perfil de usuario no encontrado')
         clearAuth()
         return
       }
-
-      if (profile) {
-        setUserProfile(profile)
-      } else {
-        setError('Perfil de usuario no encontrado')
-        clearAuth()
-      }
+      setUserProfile(profile)
     } catch (err: unknown) {
-      console.error('Auth check error', err)
       clearAuth()
       setError((err as Error)?.message ?? 'Error desconocido')
     } finally {
       isLoading.value = false
     }
   }
+
 
   /**
    * Inicializa el listener de auth state
@@ -100,12 +85,12 @@ export const useAuthStore = defineStore('auth', () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event) => {
-      // ✅ SOLO SIGNED_IN (quitar USER_UPDATED que causaba el loop)
       if (event === 'SIGNED_IN') {
         await checkAuth()
       } else if (event === 'SIGNED_OUT') {
         clearAuth()
       }
+      // Ignorar USER_UPDATED, TOKEN_REFRESHED, INITIAL_SESSION
     })
 
     return subscription.unsubscribe
