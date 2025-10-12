@@ -1,3 +1,5 @@
+// src/stores/auth.ts
+
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { User } from '@supabase/supabase-js'
@@ -34,6 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (isLoading.value) return
     isLoading.value = true
     error.value = null
+
     try {
       const {
         data: { user },
@@ -44,6 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
         return
       }
       setUser(user)
+
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
@@ -65,15 +69,27 @@ export const useAuthStore = defineStore('auth', () => {
 
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'SIGNED_IN') {
-        await checkAuth()
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // console.log('Auth event:', event, 'Session:', !!session)
+
+      //
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Solo actualizar si hay sesión válida
+        if (session?.user) {
+          setUser(session.user)
+          // Solo cargar perfil si no lo tenemos
+          if (!userProfile.value) {
+            await checkAuth()
+          }
+        }
       } else if (event === 'SIGNED_OUT') {
         clearAuth()
       }
     })
+
     return () => subscription.unsubscribe()
   }
 
