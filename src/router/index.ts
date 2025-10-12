@@ -1,5 +1,3 @@
-// src/router/index.ts
-
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -56,45 +54,31 @@ const router = createRouter({
       component: () => import('@/views/CostsView.vue'),
       meta: { requiresAuth: true },
     },
-    {
-      path: '/:pathMatch(.*)*',
-      name: 'NotFound',
-      redirect: '/',
-    },
+    { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
-/**
- * Navigation guard con manejo de autenticación
- */
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
-  // Rutas públicas
   if (!to.meta.requiresAuth) {
     if (to.meta.hideForAuth && authStore.isAuthenticated) {
-      return next({ name: 'Home' })
+      next({ name: 'Home' })
+    } else {
+      next()
     }
-    return next()
+    return
   }
 
-  // Esperar si está cargando (máximo 3 segundos)
-  if (authStore.isLoading) {
-    let waited = 0
-    while (authStore.isLoading && waited < 3000) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      waited += 100
-    }
+  // Si no está autenticado, verificar sesión
+  if (!authStore.isAuthenticated) {
+    await authStore.checkAuth()
   }
 
-  // ✅ Decisión con if/else explícito (no ternario)
   if (authStore.isAuthenticated) {
     next()
   } else {
-    next({
-      name: 'Login',
-      query: { redirect: to.fullPath },
-    })
+    next({ name: 'Login', query: { redirect: to.fullPath } })
   }
 })
 
