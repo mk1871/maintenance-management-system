@@ -36,7 +36,9 @@ const formatRole = (role: string | null): string => {
   return map[role] || role
 }
 
-const getRoleBadgeVariant = (role: string | null): 'default' | 'destructive' | 'outline' | 'secondary' => {
+const getRoleBadgeVariant = (
+  role: string | null,
+): 'default' | 'destructive' | 'outline' | 'secondary' => {
   if (!role) return 'secondary'
   const map: Record<string, 'default' | 'destructive' | 'outline' | 'secondary'> = {
     supervisor: 'default',
@@ -52,7 +54,9 @@ const navigationItems = [
   { to: '/costs', icon: CreditCardIcon, label: 'Costos' },
 ]
 
-const closeMobileMenu = () => { isMobileMenuOpen.value = false }
+const closeMobileMenu = () => {
+  isMobileMenuOpen.value = false
+}
 </script>
 
 <template>
@@ -61,8 +65,11 @@ const closeMobileMenu = () => { isMobileMenuOpen.value = false }
   </div>
 
   <div v-else class="flex h-screen">
-    <!-- Sidebar -->
-    <aside v-if="authStore.isAuthenticated" class="hidden md:flex w-64 bg-background border-r flex-col">
+    <!-- Desktop Sidebar -->
+    <aside
+      v-if="authStore.isAuthenticated"
+      class="hidden md:flex w-64 bg-background border-r flex-col"
+    >
       <div class="p-4 flex items-center justify-between">
         <div>
           <h1 class="text-xl font-bold">Sistema de Gestión</h1>
@@ -116,60 +123,68 @@ const closeMobileMenu = () => { isMobileMenuOpen.value = false }
     </aside>
 
     <!-- Mobile Header -->
-    <div v-if="authStore.isAuthenticated" class="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b p-4 flex items-center justify-between">
+    <div
+      v-if="authStore.isAuthenticated"
+      class="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b p-4 flex items-center justify-between"
+    >
       <h1 class="text-lg font-bold">Sistema de Gestión</h1>
-      <ThemeToggle />
-      <Sheet v-model:open="isMobileMenuOpen">
-        <SheetTrigger as-child>
-          <Button aria-label="Abrir menú" size="icon" variant="outline">
-            <MenuIcon class="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent class="w-64 p-0" side="left">
-          <div class="flex flex-col h-full">
-            <nav class="flex-1 p-4 overflow-y-auto">
-              <ul class="space-y-2">
-                <li v-for="item in navigationItems" :key="item.to">
-                  <RouterLink
-                    :to="item.to"
-                    active-class="bg-primary text-primary-foreground"
-                    class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors"
-                    @click="closeMobileMenu"
-                  >
-                    <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-                    <span>{{ item.label }}</span>
-                  </RouterLink>
-                </li>
-              </ul>
-            </nav>
-            <Separator />
-            <div class="p-4">
-              <div class="flex items-center gap-3 mb-4">
-                <Avatar>
-                  <AvatarImage
-                    v-if="authStore.userProfile?.profile_picture_url"
-                    :alt="authStore.fullName || 'Usuario'"
-                    :src="authStore.userProfile.profile_picture_url"
-                  />
-                  <AvatarFallback>
-                    {{ authStore.fullName.charAt(0).toUpperCase() || 'U' }}
-                  </AvatarFallback>
-                </Avatar>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium truncate">{{ authStore.fullName || 'Usuario' }}</p>
-                  <Badge :variant="getRoleBadgeVariant(authStore.role)" class="mt-1 text-xs">
-                    {{ formatRole(authStore.role) }}
-                  </Badge>
+      <!-- ThemeToggle visible en móvil -->
+      <div class="flex items-center gap-2">
+        <ThemeToggle />
+        <Sheet v-model:open="isMobileMenuOpen">
+          <SheetTrigger as-child>
+            <Button aria-label="Abrir menú" size="icon" variant="outline">
+              <MenuIcon class="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent class="w-64 p-0" side="left">
+            <div class="flex flex-col h-full">
+              <nav class="flex-1 p-4 overflow-y-auto">
+                <ul class="space-y-2">
+                  <li v-for="item in navigationItems" :key="item.to">
+                    <RouterLink
+                      :to="item.to"
+                      active-class="bg-primary text-primary-foreground"
+                      class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors"
+                      @click="closeMobileMenu"
+                    >
+                      <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                      <span>{{ item.label }}</span>
+                    </RouterLink>
+                  </li>
+                </ul>
+              </nav>
+              <Separator />
+              <div class="p-4">
+                <div class="flex items-center gap-3 mb-4">
+                  <Avatar>
+                    <AvatarImage
+                      v-if="authStore.userProfile?.profile_picture_url"
+                      :alt="authStore.fullName || 'Usuario'"
+                      :src="authStore.userProfile.profile_picture_url"
+                    />
+                    <AvatarFallback>
+                      {{ authStore.fullName.charAt(0).toUpperCase() || 'U' }}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate">
+                      {{ authStore.fullName || 'Usuario' }}
+                    </p>
+                    <Badge :variant="getRoleBadgeVariant(authStore.role)" class="mt-1 text-xs">
+                      {{ formatRole(authStore.role) }}
+                    </Badge>
+                  </div>
                 </div>
+                <Button class="w-full" variant="destructive" @click="handleLogout">
+                  <LogOutIcon class="h-5 w-5 mr-2" />
+                  Cerrar sesión
+                </Button>
               </div>
-              <Button class="w-full" variant="destructive" @click="handleLogout">
-                <LogOutIcon class="h-5 w-5 mr-2" />
-                Cerrar sesión
-              </Button>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
 
     <!-- Main Content -->
