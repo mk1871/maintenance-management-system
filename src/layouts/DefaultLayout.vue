@@ -24,7 +24,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const isMobileMenuOpen = ref(false)
 
-const handleLogout = async () => {
+const handleLogout = async (): Promise<void> => {
   await supabase.auth.signOut()
   authStore.clearAuth()
   router.replace({ name: 'Login' })
@@ -32,7 +32,10 @@ const handleLogout = async () => {
 
 const formatRole = (role: string | null): string => {
   if (!role) return 'Usuario'
-  const map: Record<string, string> = { supervisor: 'Supervisor', chief: 'Jefe' }
+  const map: Record<string, string> = {
+    supervisor: 'Supervisor',
+    chief: 'Jefe',
+  }
   return map[role] || role
 }
 
@@ -54,7 +57,7 @@ const navigationItems = [
   { to: '/costs', icon: CreditCardIcon, label: 'Costos' },
 ]
 
-const closeMobileMenu = () => {
+const closeMobileMenu = (): void => {
   isMobileMenuOpen.value = false
 }
 </script>
@@ -65,7 +68,6 @@ const closeMobileMenu = () => {
   </div>
 
   <div v-else class="flex h-screen">
-    <!-- Desktop Sidebar -->
     <aside
       v-if="authStore.isAuthenticated"
       class="hidden md:flex w-64 bg-background border-r flex-col"
@@ -122,21 +124,22 @@ const closeMobileMenu = () => {
       </div>
     </aside>
 
-    <!-- Mobile Header -->
     <div
       v-if="authStore.isAuthenticated"
       class="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b p-4 flex items-center justify-between"
     >
       <h1 class="text-lg font-bold">Sistema de Gestión</h1>
-      <!-- ThemeToggle visible en móvil -->
+
       <div class="flex items-center gap-2">
         <ThemeToggle />
+
         <Sheet v-model:open="isMobileMenuOpen">
           <SheetTrigger as-child>
             <Button aria-label="Abrir menú" size="icon" variant="outline">
               <MenuIcon class="h-5 w-5" />
             </Button>
           </SheetTrigger>
+
           <SheetContent class="w-64 p-0" side="left">
             <div class="flex flex-col h-full">
               <nav class="flex-1 p-4 overflow-y-auto">
@@ -154,7 +157,9 @@ const closeMobileMenu = () => {
                   </li>
                 </ul>
               </nav>
+
               <Separator />
+
               <div class="p-4">
                 <div class="flex items-center gap-3 mb-4">
                   <Avatar>
@@ -187,7 +192,6 @@ const closeMobileMenu = () => {
       </div>
     </div>
 
-    <!-- Main Content -->
     <main :class="authStore.isAuthenticated ? 'flex-1 overflow-auto p-6 pt-20 md:pt-6' : 'flex-1'">
       <slot />
     </main>
