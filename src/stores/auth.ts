@@ -73,7 +73,7 @@ export const useAuthStore = defineStore('auth', () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // console.log('Auth event:', event, 'Session:', !!session)
+      console.log('Auth event:', event, 'Session:', !!session)
 
       //
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
