@@ -4,117 +4,76 @@ import { useRouter, useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { LogIn, Mail, Lock } from 'lucide-vue-next'
 
-// Componentes UI
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
 
-// Servicios y stores
 import { supabase } from '@/services/supabase'
 import { useAuthStore } from '@/stores/auth'
 
+// Router y store
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-// Interfaces
+// Form data
 interface LoginFormData {
   email: string
   password: string
 }
+const formData = ref<LoginFormData>({ email: '', password: '' })
 
+// Validation errors
 interface FormErrors {
   email: string
   password: string
 }
+const errors = reactive<FormErrors>({ email: '', password: '' })
 
-// Constantes
-const MIN_PASSWORD_LENGTH = 6
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-// Estado
-const formData = ref<LoginFormData>({
-  email: '',
-  password: '',
-})
-
-const errors = reactive<FormErrors>({
-  email: '',
-  password: '',
-})
-
+// UI state
 const isLoading = ref(false)
 const hasAttemptedSubmit = ref(false)
 
-/**
- * Verifica si el formulario es válido
- */
-const isFormValid = computed(() => {
-  return (
+const MIN_PASSWORD_LENGTH = 6
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const isFormValid = computed(
+  () =>
     !errors.email &&
     !errors.password &&
     formData.value.email.length > 0 &&
-    formData.value.password.length >= MIN_PASSWORD_LENGTH
-  )
-})
+    formData.value.password.length >= MIN_PASSWORD_LENGTH,
+)
 
-/**
- * Valida el formato del email
- */
-const validateEmail = (): void => {
+const validateEmail = () => {
   const email = formData.value.email.trim()
-
   if (!email) {
     errors.email = 'El email es requerido'
-    return
-  }
-
-  if (!EMAIL_PATTERN.test(email)) {
+  } else if (!EMAIL_PATTERN.test(email)) {
     errors.email = 'Formato de email inválido'
-    return
+  } else {
+    errors.email = ''
   }
-
-  errors.email = ''
 }
 
-/**
- * Valida la contraseña
- */
-const validatePassword = (): void => {
-  const password = formData.value.password
-
-  if (!password) {
+const validatePassword = () => {
+  const pwd = formData.value.password
+  if (!pwd) {
     errors.password = 'La contraseña es requerida'
-    return
-  }
-
-  if (password.length < MIN_PASSWORD_LENGTH) {
+  } else if (pwd.length < MIN_PASSWORD_LENGTH) {
     errors.password = `Mínimo ${MIN_PASSWORD_LENGTH} caracteres`
-    return
+  } else {
+    errors.password = ''
   }
-
-  errors.password = ''
 }
 
-/**
- * Obtiene la ruta de redirección después del login
- */
 const getRedirectPath = (): string => {
-  const redirectQuery = route.query.redirect as string
-  return redirectQuery || '/'
+  const redirect = route.query.redirect as string
+  return redirect || '/'
 }
 
-/**
- * Maneja el proceso de inicio de sesión
- */
 const handleLogin = async (): Promise<void> => {
   hasAttemptedSubmit.value = true
   validateEmail()
@@ -126,45 +85,37 @@ const handleLogin = async (): Promise<void> => {
   }
 
   isLoading.value = true
+  authStore.setError(null)
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const result = await supabase.auth.signInWithPassword({
       email: formData.value.email.trim(),
       password: formData.value.password,
     })
+    const error = result.error
 
     if (error) {
-      toast.error('Credenciales incorrectas')
       errors.email = ' '
       errors.password = 'Email o contraseña incorrectos'
-      return
-    }
-
-    if (!data.user) {
-      toast.error('Error al iniciar sesión')
+      toast.error('Credenciales incorrectas')
       return
     }
 
     await authStore.checkAuth()
-
     if (authStore.isAuthenticated) {
       toast.success(`Bienvenido, ${authStore.fullName}`)
-      const redirectPath = getRedirectPath()
-      router.replace(redirectPath)
+      router.replace(getRedirectPath())
     }
-  } catch (error: unknown) {
-    console.error('Error en login:', error)
+  } catch (err: unknown) {
+    console.error('Error en login:', err)
     toast.error('Error al iniciar sesión. Intenta nuevamente.')
   } finally {
     isLoading.value = false
   }
 }
 
-/**
- * Limpia errores previos al inicializar
- */
 onMounted(() => {
-  authStore.clearError()
+  authStore.setError(null)
 })
 </script>
 
@@ -178,18 +129,12 @@ onMounted(() => {
           </div>
         </div>
         <CardTitle class="text-2xl font-bold">Iniciar Sesión</CardTitle>
-        <CardDescription>
-          Ingresa tus credenciales para acceder al sistema
-        </CardDescription>
+        <CardDescription>Ingresa tus credenciales para acceder al sistema</CardDescription>
       </CardHeader>
-
       <CardContent>
         <form class="space-y-4" @submit.prevent="handleLogin">
-          <!-- Email -->
           <div class="space-y-2">
-            <Label for="email">
-              Email *
-            </Label>
+            <Label for="email">Email *</Label>
             <div class="relative">
               <Mail class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -198,7 +143,7 @@ onMounted(() => {
                 :class="{ 'border-destructive': errors.email && hasAttemptedSubmit }"
                 autocomplete="email"
                 class="pl-9"
-                placeholder="tu@email.com"
+                placeholder="tu@mail.com"
                 type="email"
                 @blur="validateEmail"
                 @input="hasAttemptedSubmit && validateEmail()"
@@ -211,12 +156,8 @@ onMounted(() => {
               {{ errors.email }}
             </p>
           </div>
-
-          <!-- Contraseña -->
           <div class="space-y-2">
-            <Label for="password">
-              Contraseña *
-            </Label>
+            <Label for="password">Contraseña *</Label>
             <div class="relative">
               <Lock class="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -238,21 +179,12 @@ onMounted(() => {
               {{ errors.password }}
             </p>
           </div>
-
-          <!-- Botón de envío -->
-          <Button
-            :disabled="isLoading"
-            class="w-full"
-            size="lg"
-            type="submit"
-          >
+          <Button :disabled="isLoading" class="w-full" size="lg" type="submit">
             <Spinner v-if="isLoading" class="h-4 w-4 mr-2" />
             <LogIn v-else class="h-4 w-4 mr-2" />
             {{ isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
           </Button>
         </form>
-
-        <!-- Información adicional -->
         <div class="mt-6 text-center text-sm text-muted-foreground">
           <p>Sistema de Gestión de Mantenimiento</p>
         </div>
