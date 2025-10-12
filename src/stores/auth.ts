@@ -55,14 +55,16 @@ export const useAuthStore = defineStore('auth', () => {
   const initAuth = async (): Promise<() => void> => {
     await checkAuth()
 
-    // ✅ Listener de Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('🔐 Auth event:', event, 'Session:', !!session)
 
+        // ✅ MANEJAR TODOS LOS EVENTOS RELEVANTES
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // Solo actualizar si hay sesión válida
           if (session?.user) {
             setUser(session.user)
+            // Solo cargar perfil si no lo tenemos
             if (!userProfile.value) {
               await checkAuth()
             }
@@ -73,31 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     )
 
-    // ✅ NUEVO: Listener de visibilidad para móviles
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
-        console.log('📱 App visible again - checking auth')
-        // Solo verificar si ya estábamos autenticados
-        if (supabaseUser.value) {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session?.user) {
-            setUser(session.user)
-            // Recargar perfil si no lo tenemos
-            if (!userProfile.value) {
-              await checkAuth()
-            }
-          }
-        }
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Cleanup function
-    return () => {
-      subscription.unsubscribe()
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
+    return () => subscription.unsubscribe()
   }
 
   return {
