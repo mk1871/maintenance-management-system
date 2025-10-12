@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
-import { Toaster } from '@/components/ui/sonner'
+import { Toaster } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import 'vue-sonner/style.css'
@@ -10,7 +10,7 @@ import 'vue-sonner/style.css'
 const authStore = useAuthStore()
 
 const handleRetryAuth = async () => {
-  authStore.clearError()
+  authStore.setError(null)
   authStore.clearAuth()
   await authStore.checkAuth()
 }
@@ -22,16 +22,15 @@ onMounted(() => {
 
 <template>
   <div id="app" class="h-screen bg-background text-foreground">
-    <Toaster class="pointer-events-auto" position="bottom-right" />
+    <Toaster position="bottom-right" />
 
-    <!-- Mostrar spinner SIEMPRE mientras carga autenticación -->
     <div v-if="authStore.isLoading" class="h-screen flex items-center justify-center">
       <Spinner class="h-12 w-12" />
     </div>
 
     <div v-else-if="authStore.error" class="h-screen flex items-center justify-center">
-      <div class="text-center max-w-md p-8">
-        <h2 class="text-2xl font-bold text-foreground mb-4">Error de Autenticación</h2>
+      <div class="text-center p-8">
+        <h2 class="text-2xl font-bold mb-4">Error de Autenticación</h2>
         <p class="text-muted-foreground mb-6">{{ authStore.error }}</p>
         <Button @click="handleRetryAuth">Reintentar</Button>
       </div>

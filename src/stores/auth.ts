@@ -11,6 +11,8 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null)
 
   const isAuthenticated = computed(() => supabaseUser.value !== null && userProfile.value !== null)
+  const fullName = computed(() => userProfile.value?.full_name ?? '')
+  const role = computed(() => userProfile.value?.role ?? null)
 
   const setUser = (user: User | null) => {
     supabaseUser.value = user
@@ -27,15 +29,11 @@ export const useAuthStore = defineStore('auth', () => {
     userProfile.value = null
     error.value = null
   }
-  const clearError = () => {
-    error.value = null
-  }
 
   const checkAuth = async (): Promise<void> => {
     if (isLoading.value) return
     isLoading.value = true
     error.value = null
-
     try {
       const {
         data: { user },
@@ -46,22 +44,20 @@ export const useAuthStore = defineStore('auth', () => {
         return
       }
       setUser(user)
-
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single()
-
       if (profileError || !profile) {
-        setError('Perfil no encontrado')
         clearAuth()
+        setError('Perfil no encontrado')
         return
       }
       setUserProfile(profile)
     } catch (err: unknown) {
       clearAuth()
-      setError((err as Error).message ?? 'Error desconocido')
+      setError((err as Error).message || 'Error desconocido')
     } finally {
       isLoading.value = false
     }
@@ -87,10 +83,11 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     error,
     isAuthenticated,
+    fullName,
+    role,
     checkAuth,
     initAuth,
     clearAuth,
-    clearError,
     setError,
   }
 })

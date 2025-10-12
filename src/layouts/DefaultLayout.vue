@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/services/supabase'
 
@@ -26,29 +26,23 @@ const isMobileMenuOpen = ref(false)
 
 const handleLogout = async () => {
   await supabase.auth.signOut()
-  await authStore.clearAuth()
+  authStore.clearAuth()
   router.replace({ name: 'Login' })
-  window.history.replaceState({}, '', '/login')
 }
 
 const formatRole = (role: string | null): string => {
   if (!role) return 'Usuario'
-  const roleMap: Record<string, string> = {
-    supervisor: 'Supervisor',
-    chief: 'Jefe',
-  }
-  return roleMap[role] || role
+  const map: Record<string, string> = { supervisor: 'Supervisor', chief: 'Jefe' }
+  return map[role] || role
 }
 
-const getRoleBadgeVariant = (
-  role: string | null,
-): 'default' | 'destructive' | 'outline' | 'secondary' => {
+const getRoleBadgeVariant = (role: string | null): 'default' | 'destructive' | 'outline' | 'secondary' => {
   if (!role) return 'secondary'
-  const variantMap: Record<string, 'default' | 'destructive' | 'outline' | 'secondary'> = {
+  const map: Record<string, 'default' | 'destructive' | 'outline' | 'secondary'> = {
     supervisor: 'default',
     chief: 'destructive',
   }
-  return variantMap[role] || 'secondary'
+  return map[role] || 'secondary'
 }
 
 const navigationItems = [
@@ -58,9 +52,7 @@ const navigationItems = [
   { to: '/costs', icon: CreditCardIcon, label: 'Costos' },
 ]
 
-const closeMobileMenu = () => {
-  isMobileMenuOpen.value = false
-}
+const closeMobileMenu = () => { isMobileMenuOpen.value = false }
 </script>
 
 <template>
@@ -69,14 +61,11 @@ const closeMobileMenu = () => {
   </div>
 
   <div v-else class="flex h-screen">
-    <!-- Desktop Sidebar -->
-    <aside
-      v-if="authStore.isAuthenticated"
-      class="hidden md:flex w-64 bg-background border-r flex-col"
-    >
+    <!-- Sidebar -->
+    <aside v-if="authStore.isAuthenticated" class="hidden md:flex w-64 bg-background border-r flex-col">
       <div class="p-4 flex items-center justify-between">
         <div>
-          <h1 class="text-xl font-bold text-foreground">Sistema de Gestión</h1>
+          <h1 class="text-xl font-bold">Sistema de Gestión</h1>
           <p class="text-xs text-muted-foreground mt-1">Mantenimiento</p>
         </div>
         <ThemeToggle />
@@ -89,8 +78,8 @@ const closeMobileMenu = () => {
           <li v-for="item in navigationItems" :key="item.to">
             <RouterLink
               :to="item.to"
-              active-class="bg-primary text-primary-foreground hover:bg-primary/90"
-              class="flex items-center gap-3 p-3 rounded-md hover:bg-muted text-foreground transition-colors"
+              active-class="bg-primary text-primary-foreground"
+              class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors"
             >
               <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
               <span>{{ item.label }}</span>
@@ -110,19 +99,15 @@ const closeMobileMenu = () => {
               :src="authStore.userProfile.profile_picture_url"
             />
             <AvatarFallback>
-              {{ authStore.fullName?.charAt(0).toUpperCase() || 'U' }}
+              {{ authStore.fullName.charAt(0).toUpperCase() || 'U' }}
             </AvatarFallback>
           </Avatar>
-
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-foreground truncate">
-              {{ authStore.fullName || 'Usuario' }}
-            </p>
+            <p class="text-sm font-medium truncate">{{ authStore.fullName || 'Usuario' }}</p>
             <Badge :variant="getRoleBadgeVariant(authStore.role)" class="mt-1 text-xs">
               {{ formatRole(authStore.role) }}
             </Badge>
           </div>
-
           <Button aria-label="Cerrar sesión" size="icon" variant="ghost" @click="handleLogout">
             <LogOutIcon class="h-5 w-5" />
           </Button>
@@ -130,83 +115,65 @@ const closeMobileMenu = () => {
       </div>
     </aside>
 
-    <!-- Mobile Navigation -->
-    <div v-if="authStore.isAuthenticated" class="md:hidden fixed top-0 left-0 right-0 z-50">
-      <div class="bg-background border-b p-4 flex items-center justify-between">
-        <h1 class="text-lg font-bold text-foreground">Sistema de Gestión</h1>
-        <ThemeToggle />
-        <Sheet v-model:open="isMobileMenuOpen">
-          <SheetTrigger as-child>
-            <Button aria-label="Abrir menú" size="icon" variant="outline">
-              <MenuIcon class="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent class="w-64 p-0" side="left">
-            <div class="flex flex-col h-full">
-              <div class="p-4">
-                <h2 class="text-xl font-bold text-foreground">Navegación</h2>
-              </div>
-
-              <Separator />
-
-              <nav class="flex-1 p-4 overflow-y-auto">
-                <ul class="space-y-2">
-                  <li v-for="item in navigationItems" :key="item.to">
-                    <RouterLink
-                      :to="item.to"
-                      active-class="bg-primary text-primary-foreground"
-                      class="flex items-center gap-3 p-3 rounded-md hover:bg-muted text-foreground transition-colors"
-                      @click="closeMobileMenu"
-                    >
-                      <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
-                      <span>{{ item.label }}</span>
-                    </RouterLink>
-                  </li>
-                </ul>
-              </nav>
-
-              <Separator />
-
-              <div class="p-4">
-                <div class="flex items-center gap-3 mb-4">
-                  <Avatar>
-                    <AvatarImage
-                      v-if="authStore.userProfile?.profile_picture_url"
-                      :alt="authStore.fullName || 'Usuario'"
-                      :src="authStore.userProfile.profile_picture_url"
-                    />
-                    <AvatarFallback>
-                      {{ authStore.fullName?.charAt(0).toUpperCase() || 'U' }}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-foreground truncate">
-                      {{ authStore.fullName || 'Usuario' }}
-                    </p>
-                    <Badge :variant="getRoleBadgeVariant(authStore.role)" class="mt-1 text-xs">
-                      {{ formatRole(authStore.role) }}
-                    </Badge>
-                  </div>
+    <!-- Mobile Header -->
+    <div v-if="authStore.isAuthenticated" class="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b p-4 flex items-center justify-between">
+      <h1 class="text-lg font-bold">Sistema de Gestión</h1>
+      <ThemeToggle />
+      <Sheet v-model:open="isMobileMenuOpen">
+        <SheetTrigger as-child>
+          <Button aria-label="Abrir menú" size="icon" variant="outline">
+            <MenuIcon class="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent class="w-64 p-0" side="left">
+          <div class="flex flex-col h-full">
+            <nav class="flex-1 p-4 overflow-y-auto">
+              <ul class="space-y-2">
+                <li v-for="item in navigationItems" :key="item.to">
+                  <RouterLink
+                    :to="item.to"
+                    active-class="bg-primary text-primary-foreground"
+                    class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors"
+                    @click="closeMobileMenu"
+                  >
+                    <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
+                    <span>{{ item.label }}</span>
+                  </RouterLink>
+                </li>
+              </ul>
+            </nav>
+            <Separator />
+            <div class="p-4">
+              <div class="flex items-center gap-3 mb-4">
+                <Avatar>
+                  <AvatarImage
+                    v-if="authStore.userProfile?.profile_picture_url"
+                    :alt="authStore.fullName || 'Usuario'"
+                    :src="authStore.userProfile.profile_picture_url"
+                  />
+                  <AvatarFallback>
+                    {{ authStore.fullName.charAt(0).toUpperCase() || 'U' }}
+                  </AvatarFallback>
+                </Avatar>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium truncate">{{ authStore.fullName || 'Usuario' }}</p>
+                  <Badge :variant="getRoleBadgeVariant(authStore.role)" class="mt-1 text-xs">
+                    {{ formatRole(authStore.role) }}
+                  </Badge>
                 </div>
-
-                <Button class="w-full" variant="destructive" @click="handleLogout">
-                  <LogOutIcon class="h-5 w-5 mr-2" />
-                  Cerrar sesión
-                </Button>
               </div>
+              <Button class="w-full" variant="destructive" @click="handleLogout">
+                <LogOutIcon class="h-5 w-5 mr-2" />
+                Cerrar sesión
+              </Button>
             </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
 
     <!-- Main Content -->
-    <main
-      :class="[
-        authStore.isAuthenticated ? 'flex-1 overflow-auto p-6 md:p-6 pt-20 md:pt-6' : 'flex-1',
-      ]"
-    >
+    <main :class="authStore.isAuthenticated ? 'flex-1 overflow-auto p-6 pt-20 md:pt-6' : 'flex-1'">
       <slot />
     </main>
   </div>
