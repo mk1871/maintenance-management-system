@@ -9,7 +9,7 @@ const themeStore = useThemeStore()
 <template>
   <Button
     :aria-label="themeStore.isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
-    class="h-9 w-9"
+    class="h-9 w-9 touch-manipulation active:scale-95 active:bg-accent/80"
     size="icon"
     variant="ghost"
     @click="themeStore.toggleTheme"

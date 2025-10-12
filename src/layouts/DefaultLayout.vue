@@ -88,7 +88,7 @@ const closeMobileMenu = (): void => {
             <RouterLink
               :to="item.to"
               active-class="bg-primary text-primary-foreground"
-              class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors"
+              class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors active:scale-[0.98]"
             >
               <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />
               <span>{{ item.label }}</span>
@@ -148,7 +148,7 @@ const closeMobileMenu = (): void => {
                     <RouterLink
                       :to="item.to"
                       active-class="bg-primary text-primary-foreground"
-                      class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors"
+                      class="flex items-center gap-3 p-3 rounded-md hover:bg-muted transition-colors active:scale-[0.98]"
                       @click="closeMobileMenu"
                     >
                       <component :is="item.icon" class="h-5 w-5 flex-shrink-0" />

@@ -1,6 +1,9 @@
 @import url(https://fonts.bunny.net/css?family=inter:100,200,300,400,500,600,700,800,900|jetbrains-mono:200,300,400,500,600,700|source-serif-4:300,400,500,600,700);
+
 @import "./base.css";
+
 @import "tailwindcss";
+
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -189,9 +192,23 @@
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
-
-    /* Ajustar tamaño base según la demo */
     font-size: 14px;
     line-height: 20px;
+  }
+}
+
+/* Optimizaciones para móvil */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
   }
 }
