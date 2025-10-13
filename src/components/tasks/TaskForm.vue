@@ -39,14 +39,13 @@ import type {
   AccommodationElement,
 } from '@/composables/accommodationAreaService'
 
-// Props
 const props = withDefaults(
   defineProps<{
     isOpen?: boolean
     defaultAccommodationId?: string
   }>(),
   {
-    isOpen: undefined, // ✅ Cambiar a undefined para detectar cuando NO se pasa
+    isOpen: undefined,
     defaultAccommodationId: '',
   },
 )
@@ -64,7 +63,7 @@ interface FormData {
   priority: 'low' | 'medium' | 'high'
   due_date: string
   estimated_cost: string
-  assigned_to: string
+  repairer_name: string
 }
 
 interface FormErrors {
@@ -85,7 +84,7 @@ const formData = ref<FormData>({
   priority: 'medium',
   due_date: today(getLocalTimeZone()).add({ days: 1 }).toString(),
   estimated_cost: '',
-  assigned_to: '',
+  repairer_name: '',
 })
 
 const errors = ref<FormErrors>({
@@ -101,26 +100,19 @@ const configuredAreas = ref<AccommodationArea[]>([])
 const isLoadingAreas = ref(false)
 const isSubmitting = ref(false)
 const isDatePickerOpen = ref(false)
-
-// ✅ Estado interno del dialog (solo se usa si no viene isOpen como prop)
 const internalDialogOpen = ref(false)
 
-// ✅ Computed para el estado del dialog
 const showTaskForm = computed({
   get: () => {
-    // Si isOpen es undefined, usar estado interno (modo standalone)
     if (props.isOpen === undefined) {
       return internalDialogOpen.value
     }
-    // Si isOpen tiene valor, usarlo (modo controlado)
     return props.isOpen
   },
   set: (value: boolean) => {
     if (props.isOpen === undefined) {
-      // Modo standalone: actualizar estado interno
       internalDialogOpen.value = value
     } else {
-      // Modo controlado: emitir evento
       if (!value) {
         emit('close')
       }
@@ -271,7 +263,7 @@ const resetForm = (): void => {
     priority: 'medium',
     due_date: today(getLocalTimeZone()).add({ days: 1 }).toString(),
     estimated_cost: '',
-    assigned_to: '',
+    repairer_name: '',
   }
   errors.value = {
     accommodation_id: '',
@@ -302,17 +294,16 @@ const handleSubmit = async (): Promise<void> => {
       estimated_cost: formData.value.estimated_cost
         ? parseFloat(formData.value.estimated_cost)
         : undefined,
-      assigned_to: formData.value.assigned_to || undefined,
+      repairer_name: formData.value.repairer_name || undefined,
     })
 
     toast.success('Tarea creada exitosamente')
     emit('task-created')
-    emit('close')
     resetForm()
-    showTaskForm.value = false // ✅ Cerrar dialog en ambos modos
+    showTaskForm.value = false
   } catch (error: unknown) {
     console.error(error)
-    toast.error((error as Error).message || 'Error al crear la tarea')
+    toast.error('Error al crear la tarea')
   } finally {
     isSubmitting.value = false
   }
@@ -328,7 +319,6 @@ const handleDialogClose = (open: boolean): void => {
   }
 }
 
-// Watch para cargar áreas cuando cambia el alojamiento
 watch(
   () => formData.value.accommodation_id,
   async (newId) => {
@@ -342,7 +332,6 @@ watch(
   },
 )
 
-// Watch para resetear elemento cuando cambia el área
 watch(
   () => formData.value.accommodation_area_id,
   () => {
@@ -350,7 +339,6 @@ watch(
   },
 )
 
-// Watch para cargar áreas si defaultAccommodationId cambia
 watch(
   () => props.defaultAccommodationId,
   async (newValue) => {
@@ -362,7 +350,6 @@ watch(
   { immediate: true },
 )
 
-// Watch para resetear form cuando se abre el dialog
 watch(
   () => showTaskForm.value,
   (isOpen) => {
@@ -379,7 +366,6 @@ watch(
 onMounted(async () => {
   await loadAccommodations()
 
-  // Si hay defaultAccommodationId, cargar las áreas
   if (props.defaultAccommodationId) {
     await loadConfiguredAreas(props.defaultAccommodationId)
   }
@@ -388,15 +374,14 @@ onMounted(async () => {
 
 <template>
   <Dialog v-model:open="showTaskForm" @update:open="handleDialogClose">
-    <!-- Solo mostrar trigger si NO viene isOpen como prop -->
-    <DialogTrigger v-if="!isOpen" as-child>
+    <DialogTrigger v-if="isOpen === undefined" as-child>
       <Button>Nueva Tarea</Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Crear Tarea de Mantenimiento</DialogTitle>
         <DialogDescription>
-          Completa los detalles de la nueva tarea. Los campos marcados son obligatorios.
+          Completa los detalles de la nueva tarea. Los campos marcados con * son obligatorios.
         </DialogDescription>
       </DialogHeader>
 
@@ -404,8 +389,8 @@ onMounted(async () => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Alojamiento -->
           <div class="space-y-2">
-            <Label>Alojamiento *</Label>
-            <Select v-model="formData.accommodation_id">
+            <Label for="accommodation">Alojamiento *</Label>
+            <Select id="accommodation" v-model="formData.accommodation_id">
               <SelectTrigger :class="{ 'border-destructive': errors.accommodation_id }">
                 <SelectValue placeholder="Seleccionar alojamiento" />
               </SelectTrigger>
@@ -422,8 +407,8 @@ onMounted(async () => {
 
           <!-- Prioridad -->
           <div class="space-y-2">
-            <Label>Prioridad *</Label>
-            <Select v-model="formData.priority">
+            <Label for="priority">Prioridad *</Label>
+            <Select id="priority" v-model="formData.priority">
               <SelectTrigger>
                 <SelectValue>
                   <Badge :variant="getPriorityVariant(formData.priority)">
@@ -449,8 +434,9 @@ onMounted(async () => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Área -->
           <div class="space-y-2">
-            <Label>Área *</Label>
+            <Label for="area">Área *</Label>
             <Select
+              id="area"
               v-model="formData.accommodation_area_id"
               :disabled="!formData.accommodation_id || isLoadingAreas"
             >
@@ -470,8 +456,9 @@ onMounted(async () => {
 
           <!-- Elemento -->
           <div class="space-y-2">
-            <Label>Elemento *</Label>
+            <Label for="element">Elemento *</Label>
             <Select
+              id="element"
               v-model="formData.accommodation_element_id"
               :disabled="!formData.accommodation_area_id"
             >
@@ -496,28 +483,30 @@ onMounted(async () => {
 
         <!-- Descripción -->
         <div class="space-y-2">
-          <Label>Descripción *</Label>
+          <Label for="description">Descripción *</Label>
           <Textarea
+            id="description"
             v-model="formData.description"
             :class="{ 'border-destructive': errors.description }"
-            placeholder="Describe detalladamente el problema o tarea a realizar..."
+            placeholder="Describe el problema o tarea a realizar..."
             rows="4"
           />
-          <p class="text-xs text-muted-foreground">
-            {{ formData.description.length }}/10 caracteres mínimo
-          </p>
           <p v-if="errors.description" class="text-sm font-medium text-destructive">
             {{ errors.description }}
+          </p>
+          <p v-else class="text-sm text-muted-foreground">
+            Mínimo 10 caracteres ({{ formData.description.length }}/10)
           </p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Fecha de Vencimiento -->
+          <!-- Fecha de Vencimiento con Popover cerrable -->
           <div class="space-y-2">
-            <Label>Fecha de Vencimiento *</Label>
+            <Label for="due-date">Fecha de Vencimiento *</Label>
             <Popover v-model:open="isDatePickerOpen">
               <PopoverTrigger as-child>
                 <Button
+                  id="due-date"
                   :class="
                     cn(
                       'w-full justify-start text-left font-normal',
@@ -525,6 +514,7 @@ onMounted(async () => {
                       errors.due_date && 'border-destructive',
                     )
                   "
+                  type="button"
                   variant="outline"
                 >
                   <CalendarIcon class="mr-2 h-4 w-4" />
@@ -533,9 +523,9 @@ onMounted(async () => {
               </PopoverTrigger>
               <PopoverContent align="start" class="w-auto p-0">
                 <Calendar
+                  :locale="'es'"
                   :model-value="stringToDateValue(formData.due_date)"
                   initial-focus
-                  locale="es"
                   @update:model-value="handleDateUpdate"
                 />
               </PopoverContent>
@@ -547,23 +537,36 @@ onMounted(async () => {
 
           <!-- Costo Estimado -->
           <div class="space-y-2">
-            <Label>Costo Estimado (€)</Label>
+            <Label for="estimated-cost">Costo Estimado (€)</Label>
             <Input
+              id="estimated-cost"
               v-model="formData.estimated_cost"
               min="0"
               placeholder="0.00"
               step="0.01"
               type="number"
             />
-            <p class="text-xs text-muted-foreground">Opcional</p>
           </div>
+        </div>
+
+        <!-- Asignado a -->
+        <div class="space-y-2">
+          <Label for="assigned-to">Asignado a</Label>
+          <Input
+            id="assigned-to"
+            v-model="formData.repairer_name"
+            placeholder="Nombre del responsable (opcional)"
+            type="text"
+          />
         </div>
       </div>
 
-      <DialogFooter class="gap-2">
-        <Button type="button" variant="outline" @click="showTaskForm = false"> Cancelar </Button>
-        <Button :disabled="isSubmitting" @click="handleSubmit">
-          <Spinner v-if="isSubmitting" class="h-4 w-4 mr-2" />
+      <DialogFooter>
+        <Button :disabled="isSubmitting" type="button" variant="outline" @click="resetForm">
+          Limpiar
+        </Button>
+        <Button :disabled="isSubmitting" type="submit" @click="handleSubmit">
+          <Spinner v-if="isSubmitting" class="mr-2 h-4 w-4" />
           {{ isSubmitting ? 'Creando...' : 'Crear Tarea' }}
         </Button>
       </DialogFooter>

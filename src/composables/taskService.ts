@@ -61,6 +61,7 @@ export interface Task {
   start_date?: string
   completed_date?: string
   repairer_id?: string
+  repairer_name?: string
   solution?: string
   time_spent_days?: number
   notes?: string
@@ -91,7 +92,7 @@ export interface CreateTaskData {
   due_date: string
   notes?: string
   estimated_cost?: number
-  assigned_to?: string
+  repairer_name?: string
 }
 
 export interface UpdateTaskData {
@@ -292,7 +293,7 @@ export const taskService = {
       due_date: taskData.due_date,
       notes: taskData.notes,
       estimated_cost: taskData.estimated_cost,
-      assigned_to: taskData.assigned_to,
+      repairer_name: taskData.repairer_name,
       detection_date: getCurrentTimestamp(),
       created_by: user.id,
     }

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
+import { TriangleAlert } from 'lucide-vue-next'
 
 import AreaSelector, { type SelectedArea } from './AreaSelector.vue'
 import AreaElementsConfig, { type SelectedElement } from './AreaElementsConfig.vue'
@@ -85,7 +86,6 @@ const elementCatalogMap = computed((): Map<string, ElementCatalog[]> => {
   return map
 })
 
-// ✅ FIX: Validar que CADA área tenga al menos 1 elemento
 const areasWithoutElements = computed(() => {
   return selectedAreas.value.filter((area) => {
     return !selectedElements.value.some(
@@ -205,9 +205,9 @@ const handleCreate = async (): Promise<void> => {
     const accommodation = await accommodationService.create({
       code: formData.value.code.trim().toUpperCase(),
       name: formData.value.name.trim(),
-      address: formData.value.address?.trim(),
+      address: formData.value.address?.trim() || undefined,
       status: formData.value.status,
-      notes: formData.value.notes?.trim(),
+      notes: formData.value.notes?.trim() || undefined,
       configured_areas: buildConfiguredAreas(),
     })
 
@@ -241,7 +241,7 @@ onMounted(async () => {
       <DialogHeader>
         <DialogTitle>Crear Alojamiento</DialogTitle>
         <DialogDescription>
-          Completa la información del nuevo alojamiento. Los campos marcados son obligatorios.
+          Completa la información del nuevo alojamiento. Los campos marcados con * son obligatorios.
         </DialogDescription>
       </DialogHeader>
 
@@ -253,11 +253,12 @@ onMounted(async () => {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <!-- Código -->
             <div class="space-y-2">
-              <Label>
+              <Label for="code">
                 Código *
                 <span class="text-xs text-muted-foreground ml-2">(1-4 caracteres: A-Z, 0-9)</span>
               </Label>
               <Input
+                id="code"
                 v-model="formData.code"
                 :class="{ 'border-destructive': errors.code }"
                 maxlength="4"
@@ -272,8 +273,9 @@ onMounted(async () => {
 
             <!-- Nombre -->
             <div class="space-y-2">
-              <Label>Nombre *</Label>
+              <Label for="name">Nombre *</Label>
               <Input
+                id="name"
                 v-model="formData.name"
                 :class="{ 'border-destructive': errors.name }"
                 placeholder="Ej: Apartamento Centro"
@@ -286,14 +288,18 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-2">
-            <Label>Dirección</Label>
-            <Input v-model="formData.address" placeholder="Ej: Calle Mayor 123, Madrid" />
+            <Label for="address">Dirección</Label>
+            <Input
+              id="address"
+              v-model="formData.address"
+              placeholder="Ej: Calle Mayor 123, Madrid"
+            />
             <p class="text-xs text-muted-foreground">Opcional</p>
           </div>
 
           <div class="space-y-2">
-            <Label>Estado *</Label>
-            <Select v-model="formData.status">
+            <Label for="status">Estado *</Label>
+            <Select id="status" v-model="formData.status">
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -305,8 +311,8 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-2">
-            <Label>Notas</Label>
-            <Textarea v-model="formData.notes" placeholder="Observaciones..." rows="3" />
+            <Label for="notes">Notas</Label>
+            <Textarea id="notes" v-model="formData.notes" placeholder="Observaciones..." rows="3" />
             <p class="text-xs text-muted-foreground">Opcional</p>
           </div>
         </div>
@@ -334,18 +340,18 @@ onMounted(async () => {
             <p
               v-for="area in areasWithoutElements"
               :key="`${area.area_catalog_id}-${area.room_number || 0}`"
-              class="text-sm text-destructive flex items-center gap-1"
+              class="text-sm text-destructive flex items-center gap-2"
             >
-              <span class="font-bold">⚠️</span>
-              {{ area.label }} no tiene elementos seleccionados
+              <TriangleAlert class="h-4 w-4 flex-shrink-0" />
+              <span>{{ area.label }} no tiene elementos seleccionados</span>
             </p>
           </div>
         </div>
       </div>
 
       <DialogFooter class="gap-2">
-        <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancelar </Button>
-        <Button :disabled="!isFormValid || isSubmitting" @click="handleCreate">
+        <Button type="button" variant="outline" @click="isDialogOpen = false">Cancelar</Button>
+        <Button :disabled="!isFormValid || isSubmitting" type="submit" @click="handleCreate">
           <Spinner v-if="isSubmitting" class="h-4 w-4 mr-2" />
           {{ isSubmitting ? 'Creando...' : 'Crear Alojamiento' }}
         </Button>

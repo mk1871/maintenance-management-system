@@ -18,7 +18,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, CheckCircle, Trash2 } from 'lucide-vue-next'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { MoreHorizontal, CheckCircle, Trash2, ListTodo } from 'lucide-vue-next'
 
 import type { TaskWithRelations } from '@/composables/taskService'
 
@@ -45,20 +46,16 @@ const getPriorityVariant = (priority: string): 'default' | 'destructive' | 'seco
 
 const getStatusVariant = (status: string): 'default' | 'outline' | 'secondary' | 'destructive' => {
   const variants: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
-    pending: 'secondary', // Gris
-    in_progress: 'default', // Azul del tema
-    completed: 'outline', // Verde - usando outline + clase semantic
-    cancelled: 'destructive', // Rojo
+    pending: 'secondary',
+    in_progress: 'default',
+    completed: 'outline',
+    cancelled: 'destructive',
   }
   return variants[status] ?? 'secondary'
 }
 
-/**
- * Obtiene clases adicionales para el badge de estado
- */
 const getStatusClasses = (status: string): string => {
   if (status === 'completed') {
-    // Clase que usa variables CSS del tema
     return 'border-green-600 text-green-600 dark:border-green-400 dark:text-green-400'
   }
   return ''
@@ -110,18 +107,6 @@ const handleRowClick = (taskId: string): void => {
 const canComplete = (task: TaskWithRelations): boolean => {
   return task.status !== 'completed' && task.status !== 'cancelled'
 }
-
-const getAreaLabel = (task: TaskWithRelations): string => {
-  return task.area_label || 'N/A'
-}
-
-const getElementName = (task: TaskWithRelations): string => {
-  return task.element_name || 'N/A'
-}
-
-const getAccommodationCode = (task: TaskWithRelations): string => {
-  return task.accommodation?.code || 'N/A'
-}
 </script>
 
 <template>
@@ -139,6 +124,7 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
         </TableRow>
       </TableHeader>
       <TableBody>
+        <!-- Loading State -->
         <template v-if="isLoading">
           <TableRow v-for="i in 5" :key="`skeleton-${i}`">
             <TableCell><Skeleton class="h-4 w-full" /></TableCell>
@@ -151,17 +137,27 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
           </TableRow>
         </template>
 
+        <!-- Empty State con componente oficial -->
         <TableRow v-else-if="tasks.length === 0">
-          <TableCell class="h-24 text-center text-muted-foreground" colspan="7">
-            No hay tareas disponibles
+          <TableCell class="h-64" colspan="7">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <ListTodo class="h-12 w-12" />
+                </EmptyMedia>
+                <EmptyTitle>No hay tareas disponibles</EmptyTitle>
+                <EmptyDescription> Las tareas que crees aparecerán aquí </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           </TableCell>
         </TableRow>
 
+        <!-- Data Rows -->
         <template v-else>
           <TableRow
             v-for="task in tasks"
             :key="task.id"
-            class="cursor-pointer hover:bg-muted/50"
+            class="cursor-pointer hover:bg-muted/50 transition-colors"
             @click="handleRowClick(task.id)"
           >
             <TableCell class="font-medium max-w-[300px]">
@@ -174,13 +170,13 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
             </TableCell>
             <TableCell>
               <span class="font-mono text-sm">
-                {{ getAccommodationCode(task) }}
+                {{ task.accommodation?.code || 'N/A' }}
               </span>
             </TableCell>
             <TableCell class="text-sm text-muted-foreground">
               <div class="flex flex-col">
-                <span>{{ getAreaLabel(task) }}</span>
-                <span class="text-xs">{{ getElementName(task) }}</span>
+                <span>{{ task.area_label || 'N/A' }}</span>
+                <span class="text-xs">{{ task.element_name || 'N/A' }}</span>
               </div>
             </TableCell>
             <TableCell>
@@ -201,8 +197,13 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
             </TableCell>
             <TableCell>
               <DropdownMenu>
-                <DropdownMenuTrigger as-child @click.stop="">
-                  <Button class="h-8 w-8" size="icon" variant="ghost">
+                <DropdownMenuTrigger as-child @click.stop>
+                  <Button
+                    aria-label="Acciones de la tarea"
+                    class="h-8 w-8"
+                    size="icon"
+                    variant="ghost"
+                  >
                     <MoreHorizontal class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -212,7 +213,7 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
                     @click.stop="emit('complete', task.id)"
                   >
                     <CheckCircle class="mr-2 h-4 w-4" />
-                    Marcar completada
+                    <span>Marcar completada</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator v-if="canComplete(task)" />
                   <DropdownMenuItem
@@ -220,7 +221,7 @@ const getAccommodationCode = (task: TaskWithRelations): string => {
                     @click.stop="emit('delete', task.id)"
                   >
                     <Trash2 class="mr-2 h-4 w-4" />
-                    Eliminar
+                    <span>Eliminar</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
