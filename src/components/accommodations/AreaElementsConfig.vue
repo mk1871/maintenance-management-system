@@ -81,7 +81,8 @@ const handleElementCheckboxChange = (
         !(
           selected.area_catalog_id === area.area_catalog_id &&
           selected.element_catalog_id === element.id &&
-          (selected.room_number === area.room_number || (!selected.room_number && !area.room_number))
+          (selected.room_number === area.room_number ||
+            (!selected.room_number && !area.room_number))
         ),
     )
     emit('update:modelValue', filtered)
@@ -129,9 +130,7 @@ const removeElement = (
   <div v-if="selectedAreas.length > 0" class="space-y-4">
     <div class="flex flex-col gap-1">
       <Label>Configurar Elementos por Área *</Label>
-      <p class="text-sm text-muted-foreground">
-        Selecciona los elementos disponibles en cada área
-      </p>
+      <p class="text-sm text-muted-foreground">Selecciona los elementos disponibles en cada área</p>
     </div>
 
     <div class="space-y-6 border rounded-md p-4 max-h-[500px] overflow-y-auto">

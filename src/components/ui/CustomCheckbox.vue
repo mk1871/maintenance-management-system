@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { Check } from 'lucide-vue-next'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/utils.ts'
 
 const props = defineProps<{
   checked: boolean
