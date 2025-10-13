@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { Separator } from '@/components/ui/separator'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ListTodo, Clock, Loader, CheckCircle, AlertTriangle } from 'lucide-vue-next'
 
 import TaskList from '@/components/tasks/TaskList.vue'
 import TaskFilters from '@/components/tasks/TaskFilters.vue'
@@ -20,16 +22,13 @@ import TaskForm from '@/components/tasks/TaskForm.vue'
 
 import { taskService, type TaskWithRelations } from '@/composables/taskService'
 
-// Composables
 const router = useRouter()
 
-// State
 const tasks = ref<TaskWithRelations[]>([])
 const isLoading = ref(true)
 const taskToDelete = ref<TaskWithRelations | null>(null)
 const isDeleting = ref(false)
 
-// Filtros
 const searchQuery = ref('')
 const statusFilter = ref('all')
 const priorityFilter = ref('all')
@@ -38,14 +37,46 @@ const priorityFilter = ref('all')
  * Estadísticas calculadas
  */
 const stats = computed(() => {
-  return calculateTaskStats()
+  const total = tasks.value.length
+  const pending = tasks.value.filter((t) => t.status === 'pending').length
+  const inProgress = tasks.value.filter((t) => t.status === 'in_progress').length
+  const completed = tasks.value.filter((t) => t.status === 'completed').length
+  const overdue = tasks.value.filter((t) => {
+    if (t.status === 'completed' || t.status === 'cancelled') return false
+    return new Date(t.due_date) < new Date()
+  }).length
+
+  return { total, pending, inProgress, completed, overdue }
 })
 
 /**
  * Tareas filtradas
  */
 const filteredTasks = computed((): TaskWithRelations[] => {
-  return applyFilters()
+  let filtered = [...tasks.value]
+
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter((task) => {
+      const searchableFields = [
+        task.description.toLowerCase(),
+        task.accommodation?.code.toLowerCase() || '',
+        task.area_label?.toLowerCase() || '',
+        task.element_name?.toLowerCase() || '',
+      ]
+      return searchableFields.some((field) => field.includes(query))
+    })
+  }
+
+  if (statusFilter.value !== 'all') {
+    filtered = filtered.filter((task) => task.status === statusFilter.value)
+  }
+
+  if (priorityFilter.value !== 'all') {
+    filtered = filtered.filter((task) => task.priority === priorityFilter.value)
+  }
+
+  return filtered
 })
 
 /**
@@ -61,70 +92,6 @@ const loadTasks = async (): Promise<void> => {
   } finally {
     isLoading.value = false
   }
-}
-
-/**
- * Calcula estadísticas de tareas
- */
-const calculateTaskStats = () => {
-  const total = tasks.value.length
-  const pending = tasks.value.filter((t) => t.status === 'pending').length
-  const inProgress = tasks.value.filter((t) => t.status === 'in_progress').length
-  const completed = tasks.value.filter((t) => t.status === 'completed').length
-  const overdue = tasks.value.filter((t) => isTaskOverdue(t)).length
-
-  return { total, pending, inProgress, completed, overdue }
-}
-
-/**
- * Verifica si una tarea está vencida
- */
-const isTaskOverdue = (task: TaskWithRelations): boolean => {
-  if (task.status === 'completed' || task.status === 'cancelled') {
-    return false
-  }
-  return new Date(task.due_date) < new Date()
-}
-
-/**
- * Aplica filtros a las tareas
- */
-const applyFilters = (): TaskWithRelations[] => {
-  let filtered = [...tasks.value]
-
-  // Filtro de búsqueda
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter((task) =>
-      matchesSearchQuery(task, query)
-    )
-  }
-
-  // Filtro de estado
-  if (statusFilter.value !== 'all') {
-    filtered = filtered.filter((task) => task.status === statusFilter.value)
-  }
-
-  // Filtro de prioridad
-  if (priorityFilter.value !== 'all') {
-    filtered = filtered.filter((task) => task.priority === priorityFilter.value)
-  }
-
-  return filtered
-}
-
-/**
- * Verifica si una tarea coincide con la búsqueda
- */
-const matchesSearchQuery = (task: TaskWithRelations, query: string): boolean => {
-  const searchableFields = [
-    task.description.toLowerCase(),
-    task.accommodation?.code.toLowerCase() || '',
-    task.area_label?.toLowerCase() || '',
-    task.element_name?.toLowerCase() || '',
-  ]
-
-  return searchableFields.some((field) => field.includes(query))
 }
 
 /**
@@ -227,7 +194,6 @@ const handleTaskCreated = (): void => {
   loadTasks()
 }
 
-// Lifecycle
 onMounted(async () => {
   await loadTasks()
 })
@@ -235,47 +201,72 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- Header con Estadísticas -->
-    <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div>
-        <h1 class="text-3xl font-bold">Tareas</h1>
-        <p class="text-muted-foreground">
-          Gestiona y monitorea todas las tareas de mantenimiento
-        </p>
-      </div>
+    <!-- Header -->
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">Tareas</h1>
+      <p class="text-muted-foreground">Gestiona y monitorea todas las tareas de mantenimiento</p>
+    </div>
 
-      <!-- Estadísticas Compactas -->
-      <div class="flex gap-4">
-        <div class="border rounded-lg p-3 bg-card">
-          <div class="flex items-center gap-2">
-            <div class="text-2xl font-bold">{{ stats.total }}</div>
-            <div class="text-sm text-muted-foreground">Total</div>
+    <!-- Estadísticas con Cards oficiales -->
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <Card>
+        <CardContent class="flex items-center justify-between p-6">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-muted-foreground">Total</p>
+            <p class="text-3xl font-bold">{{ stats.total }}</p>
           </div>
-        </div>
-        <div class="border rounded-lg p-3 bg-card">
-          <div class="flex items-center gap-2">
-            <div class="text-2xl font-bold text-blue-600">{{ stats.pending }}</div>
-            <div class="text-sm text-muted-foreground">Pendientes</div>
+          <ListTodo class="h-8 w-8 text-muted-foreground" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent class="flex items-center justify-between p-6">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-muted-foreground">Pendientes</p>
+            <p class="text-3xl font-bold text-blue-600 dark:text-blue-400">{{ stats.pending }}</p>
           </div>
-        </div>
-        <div class="border rounded-lg p-3 bg-card">
-          <div class="flex items-center gap-2">
-            <div class="text-2xl font-bold text-green-600">{{ stats.completed }}</div>
-            <div class="text-sm text-muted-foreground">Completadas</div>
+          <Clock class="h-8 w-8 text-blue-600 dark:text-blue-400" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent class="flex items-center justify-between p-6">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-muted-foreground">En Progreso</p>
+            <p class="text-3xl font-bold text-amber-600 dark:text-amber-400">
+              {{ stats.inProgress }}
+            </p>
           </div>
-        </div>
-        <div v-if="stats.overdue > 0" class="border rounded-lg p-3 bg-card border-destructive">
-          <div class="flex items-center gap-2">
-            <div class="text-2xl font-bold text-destructive">{{ stats.overdue }}</div>
-            <div class="text-sm text-muted-foreground">Vencidas</div>
+          <Loader class="h-8 w-8 text-amber-600 dark:text-amber-400" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent class="flex items-center justify-between p-6">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-muted-foreground">Completadas</p>
+            <p class="text-3xl font-bold text-green-600 dark:text-green-400">
+              {{ stats.completed }}
+            </p>
           </div>
-        </div>
-      </div>
+          <CheckCircle class="h-8 w-8 text-green-600 dark:text-green-400" />
+        </CardContent>
+      </Card>
+
+      <Card v-if="stats.overdue > 0" class="border-destructive">
+        <CardContent class="flex items-center justify-between p-6">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-muted-foreground">Vencidas</p>
+            <p class="text-3xl font-bold text-destructive">{{ stats.overdue }}</p>
+          </div>
+          <AlertTriangle class="h-8 w-8 text-destructive" />
+        </CardContent>
+      </Card>
     </div>
 
     <Separator />
 
-    <!-- Toolbar con Filtros y Botón de Crear -->
+    <!-- Toolbar -->
     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <h2 class="text-xl font-semibold">Lista de Tareas</h2>
       <TaskForm @task-created="handleTaskCreated" />
@@ -310,9 +301,7 @@ onMounted(async () => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="closeDeleteDialog">
-            Cancelar
-          </AlertDialogCancel>
+          <AlertDialogCancel @click="closeDeleteDialog"> Cancelar </AlertDialogCancel>
           <AlertDialogAction
             :disabled="isDeleting"
             class="bg-destructive text-destructive-foreground hover:bg-destructive/90"

@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
-import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -39,10 +39,9 @@ watch(selectedPriority, (newValue) => {
 /**
  * Emite actualización de búsqueda
  */
-const handleSearchInput = (event: Event): void => {
-  const input = event.target as HTMLInputElement
-  searchQuery.value = input.value
-  emit('update:search', input.value)
+const handleSearchInput = (value: string): void => {
+  searchQuery.value = value
+  emit('update:search', value)
 }
 
 /**
@@ -60,9 +59,7 @@ const clearFilters = (): void => {
  */
 const hasActiveFilters = (): boolean => {
   return (
-    searchQuery.value !== '' ||
-    selectedStatus.value !== 'all' ||
-    selectedPriority.value !== 'all'
+    searchQuery.value !== '' || selectedStatus.value !== 'all' || selectedPriority.value !== 'all'
   )
 }
 </script>
@@ -70,16 +67,17 @@ const hasActiveFilters = (): boolean => {
 <template>
   <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div class="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-      <!-- Búsqueda -->
-      <div class="relative w-full md:w-[300px]">
-        <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          :value="searchQuery"
-          class="pl-8"
+      <!-- Búsqueda con InputGroup (componente oficial) -->
+      <InputGroup class="w-full md:w-[300px]">
+        <InputGroupAddon>
+          <Search class="h-4 w-4" />
+        </InputGroupAddon>
+        <InputGroupInput
+          :model-value="searchQuery"
           placeholder="Buscar tareas..."
-          @input="handleSearchInput"
+          @update:model-value="handleSearchInput"
         />
-      </div>
+      </InputGroup>
 
       <!-- Estado -->
       <Select v-model="selectedStatus">
@@ -110,12 +108,7 @@ const hasActiveFilters = (): boolean => {
     </div>
 
     <!-- Limpiar Filtros -->
-    <Button
-      v-if="hasActiveFilters()"
-      size="sm"
-      variant="outline"
-      @click="clearFilters"
-    >
+    <Button v-if="hasActiveFilters()" size="sm" variant="outline" @click="clearFilters">
       <X class="mr-2 h-4 w-4" />
       Limpiar filtros
     </Button>

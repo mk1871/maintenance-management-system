@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,83 +30,52 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MoreHorizontal, Search, Edit, Trash2 } from 'lucide-vue-next'
+import { Search, MoreHorizontal, Edit, Trash2, Building2 } from 'lucide-vue-next'
 
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
 import { useAccommodationForm } from '@/composables/useAccommodationForm'
 
-// Props
 const props = defineProps<{
   accommodations: Accommodation[]
   isLoading: boolean
 }>()
 
-// Emits
 const emit = defineEmits<{
   (e: 'refresh'): void
   (e: 'edit', accommodation: Accommodation): void
 }>()
 
-// Composables
 const router = useRouter()
 const { handleApiError } = useAccommodationForm()
 
-// State
 const searchQuery = ref('')
 const accommodationToDelete = ref<Accommodation | null>(null)
 const isDeleting = ref(false)
 
-/**
- * Accommodations filtrados por búsqueda
- */
 const filteredAccommodations = computed((): Accommodation[] => {
-  return filterAccommodationsBySearch()
-})
-
-/**
- * Filtra accommodations por consulta de búsqueda
- */
-const filterAccommodationsBySearch = (): Accommodation[] => {
   if (!searchQuery.value.trim()) {
     return props.accommodations
   }
 
-  const query = normalizeSearchQuery(searchQuery.value)
+  const query = searchQuery.value.toLowerCase().trim()
 
-  return props.accommodations.filter((accommodation) => matchesSearchQuery(accommodation, query))
-}
+  return props.accommodations.filter((accommodation) => {
+    const searchableFields = [
+      accommodation.code.toLowerCase(),
+      accommodation.name.toLowerCase(),
+      accommodation.address?.toLowerCase() || '',
+    ]
 
-/**
- * Normaliza la consulta de búsqueda
- */
-const normalizeSearchQuery = (query: string): string => {
-  return query.toLowerCase().trim()
-}
+    return searchableFields.some((field) => field.includes(query))
+  })
+})
 
-/**
- * Verifica si un accommodation coincide con la búsqueda
- */
-const matchesSearchQuery = (accommodation: Accommodation, query: string): boolean => {
-  const searchableFields = [
-    accommodation.code.toLowerCase(),
-    accommodation.name.toLowerCase(),
-    accommodation.address?.toLowerCase() || '',
-  ]
-
-  return searchableFields.some((field) => field.includes(query))
-}
-
-/**
- * Obtiene la variante del badge según el estado
- */
 const getStatusBadgeVariant = (status: string): 'default' | 'secondary' => {
   return status === 'active' ? 'default' : 'secondary'
 }
 
-/**
- * Obtiene el label del estado
- */
 const getStatusLabel = (status: string): string => {
   const labels: Record<string, string> = {
     active: 'Activo',
@@ -115,45 +84,27 @@ const getStatusLabel = (status: string): string => {
   return labels[status] || status
 }
 
-/**
- * Navega al detalle de un accommodation
- */
 const navigateToDetail = (accommodationId: string): void => {
   router.push({ name: 'AccommodationDetail', params: { id: accommodationId } })
 }
 
-/**
- * Maneja el click en la fila
- */
 const handleRowClick = (accommodationId: string): void => {
   navigateToDetail(accommodationId)
 }
 
-/**
- * Abre el dialog de edición (previene propagación del click)
- */
 const openEditDialog = (accommodation: Accommodation, event: Event): void => {
   event.stopPropagation()
   emit('edit', accommodation)
 }
 
-/**
- * Abre el dialog de confirmación de eliminación
- */
 const openDeleteDialog = (accommodation: Accommodation): void => {
   accommodationToDelete.value = accommodation
 }
 
-/**
- * Cierra el dialog de eliminación
- */
 const closeDeleteDialog = (): void => {
   accommodationToDelete.value = null
 }
 
-/**
- * Elimina un accommodation después de confirmación
- */
 const handleDeleteAccommodation = async (): Promise<void> => {
   if (!accommodationToDelete.value) return
 
@@ -171,9 +122,6 @@ const handleDeleteAccommodation = async (): Promise<void> => {
   }
 }
 
-/**
- * Formatea una fecha para mostrar
- */
 const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString('es-ES', {
     year: 'numeric',
@@ -185,11 +133,13 @@ const formatDate = (dateString: string): string => {
 
 <template>
   <div class="space-y-4">
-    <!-- Buscador -->
-    <div class="relative w-full md:w-[300px]">
-      <Search class="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-      <Input v-model="searchQuery" class="pl-8" placeholder="Buscar alojamientos..." />
-    </div>
+    <!-- Buscador con InputGroup (componente oficial shadcn-vue) -->
+    <InputGroup class="w-full md:w-[300px]">
+      <InputGroupAddon>
+        <Search class="h-4 w-4" />
+      </InputGroupAddon>
+      <InputGroupInput v-model="searchQuery" placeholder="Buscar alojamientos..." />
+    </InputGroup>
 
     <!-- Loading State con Skeletons -->
     <div v-if="isLoading" class="rounded-md border">
@@ -233,8 +183,24 @@ const formatDate = (dateString: string): string => {
         <TableBody>
           <!-- Empty State -->
           <TableRow v-if="filteredAccommodations.length === 0">
-            <TableCell class="h-24 text-center text-muted-foreground" colspan="6">
-              {{ searchQuery ? 'No se encontraron alojamientos' : 'No hay alojamientos creados' }}
+            <TableCell class="h-64" colspan="6">
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Building2 class="h-12 w-12" />
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {{ searchQuery ? 'No se encontraron alojamientos' : 'No hay alojamientos' }}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {{
+                      searchQuery
+                        ? 'Intenta con otros términos de búsqueda'
+                        : 'Comienza creando tu primer alojamiento'
+                    }}
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             </TableCell>
           </TableRow>
 
@@ -242,7 +208,7 @@ const formatDate = (dateString: string): string => {
           <TableRow
             v-for="accommodation in filteredAccommodations"
             :key="accommodation.id"
-            class="cursor-pointer hover:bg-muted/50"
+            class="cursor-pointer hover:bg-muted/50 transition-colors"
             @click="handleRowClick(accommodation.id)"
           >
             <TableCell class="font-medium">
@@ -262,15 +228,20 @@ const formatDate = (dateString: string): string => {
             </TableCell>
             <TableCell>
               <DropdownMenu>
-                <DropdownMenuTrigger as-child @click.stop="">
-                  <Button class="h-8 w-8" size="icon" variant="ghost">
+                <DropdownMenuTrigger as-child @click.stop>
+                  <Button
+                    aria-label="Acciones del alojamiento"
+                    class="h-8 w-8"
+                    size="icon"
+                    variant="ghost"
+                  >
                     <MoreHorizontal class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem @click.stop="openEditDialog(accommodation, $event)">
                     <Edit class="mr-2 h-4 w-4" />
-                    Editar
+                    <span>Editar</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -278,7 +249,7 @@ const formatDate = (dateString: string): string => {
                     @click.stop="openDeleteDialog(accommodation)"
                   >
                     <Trash2 class="mr-2 h-4 w-4" />
-                    Eliminar
+                    <span>Eliminar</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
