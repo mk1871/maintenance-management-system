@@ -1,7 +1,6 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { toast } from 'vue-sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Empty,
@@ -21,37 +20,44 @@ import TaskCostsList from '@/components/tasks/TaskCostsList.vue'
 import TaskCostDialog from '@/components/tasks/TaskCostDialog.vue'
 import TaskTimelineCard from '@/components/tasks/TaskTimelineCard.vue'
 
-import { taskService, type TaskWithRelations } from '@/composables/taskService'
-import { costService, type Cost } from '@/composables/costService'
+import { useTasksStore } from '@/stores/tasks'
+import { useCostsStore } from '@/stores/costs'
 
 const route = useRoute()
 const router = useRouter()
 
+const tasksStore = useTasksStore()
+const costsStore = useCostsStore()
+
 const taskId = route.params.id as string
-const task = ref<TaskWithRelations | null>(null)
-const costs = ref<Cost[]>([])
 const isLoading = ref(true)
 const showCostDialog = ref(false)
+
+// Computed para obtener la tarea desde el store
+const task = computed(() => tasksStore.getTaskById(taskId))
+
+// Computed para filtrar costos de esta tarea
+const taskCosts = computed(() => costsStore.costs.filter((cost) => cost.task_id === taskId))
 
 const loadTaskData = async (): Promise<void> => {
   try {
     isLoading.value = true
-    const [taskData, costsData] = await Promise.all([
-      taskService.getById(taskId),
-      costService.getByTaskId(taskId),
-    ])
 
-    if (!taskData) {
-      toast.error('Tarea no encontrada')
+    // Cargar tarea si no está en el store
+    if (!task.value) {
+      await tasksStore.fetchTasks()
+    }
+
+    // Cargar costos
+    await costsStore.fetchCosts()
+
+    // Si después de cargar no existe, redirigir
+    if (!task.value) {
       router.push('/tasks')
       return
     }
-
-    task.value = taskData
-    costs.value = costsData || []
   } catch (err: unknown) {
     console.error(err)
-    toast.error('Error al cargar los datos de la tarea')
   } finally {
     isLoading.value = false
   }
@@ -59,41 +65,34 @@ const loadTaskData = async (): Promise<void> => {
 
 const handleStartRepair = async (repairerName: string): Promise<void> => {
   try {
-    await taskService.update({
-      id: taskId,
+    await tasksStore.updateTask(taskId, {
       status: 'in_progress',
       repairer_name: repairerName,
       start_date: new Date().toISOString(),
     })
-
-    await loadTaskData()
-    toast.success('Reparación iniciada exitosamente')
   } catch (err: unknown) {
     console.error(err)
-    toast.error('Error al iniciar la reparación')
   }
 }
 
 const handleCompleteTask = async (): Promise<void> => {
   try {
-    await taskService.update({
-      id: taskId,
+    await tasksStore.updateTask(taskId, {
       status: 'completed',
       completed_date: new Date().toISOString(),
       solution: 'Reparación completada',
     })
-
-    await loadTaskData()
-    toast.success('Tarea completada exitosamente')
   } catch (err: unknown) {
     console.error(err)
-    toast.error('Error al completar la tarea')
   }
 }
 
-const handleCostAdded = async (cost: Cost): Promise<void> => {
-  costs.value = [cost, ...costs.value]
+const handleCostAdded = (): void => {
   showCostDialog.value = false
+}
+
+const handleTaskUpdated = (): void => {
+  // El store ya actualizó la tarea automáticamente
 }
 
 const goBack = (): void => {
@@ -142,7 +141,8 @@ onMounted(async () => {
 
     <!-- Content -->
     <div v-else class="space-y-6">
-      <TaskDetailHeader :task="task" @back="goBack" @updated="loadTaskData" />
+      <!-- Header con botón de edición y badges -->
+      <TaskDetailHeader :task="task" @back="goBack" @updated="handleTaskUpdated" />
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Content -->
@@ -153,7 +153,7 @@ onMounted(async () => {
             @start-repair="handleStartRepair"
             @complete-task="handleCompleteTask"
           />
-          <TaskCostsList :costs="costs" @add-cost="showCostDialog = true" />
+          <TaskCostsList :costs="taskCosts" @add-cost="showCostDialog = true" />
         </div>
 
         <!-- Sidebar -->

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { toast } from 'vue-sonner'
 import { CalendarIcon, Edit } from 'lucide-vue-next'
 import type { DateValue } from '@internationalized/date'
@@ -29,7 +29,8 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
-import { taskService, type TaskWithRelations, type TaskPriority } from '@/composables/taskService'
+import { useTasksStore } from '@/stores/tasks'
+import type { TaskWithRelations, TaskPriority } from '@/composables/taskService'
 
 // Props
 const props = defineProps<{
@@ -40,9 +41,12 @@ const emit = defineEmits<{
   (e: 'updated'): void
 }>()
 
+const tasksStore = useTasksStore()
+
 // Estado
 const isOpen = ref(false)
 const isSubmitting = ref(false)
+const isCalendarOpen = ref(false)
 
 // Form data
 const formData = ref({
@@ -63,6 +67,11 @@ const errors = ref({
 // Date formatter
 const TIME_ZONE = getLocalTimeZone()
 const dateFormatter = new DateFormatter('es-ES', { dateStyle: 'medium' })
+
+// ✅ NUEVO: Computed para deshabilitar edición si tarea completada/cancelada
+const canEdit = computed(() => {
+  return props.task.status !== 'completed' && props.task.status !== 'cancelled'
+})
 
 /**
  * Inicializa el formulario con datos de la tarea
@@ -96,10 +105,10 @@ const validateForm = (): boolean => {
   }
 
   const dueDate = new Date(formData.value.due_date)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayDate = new Date()
+  todayDate.setHours(0, 0, 0, 0)
 
-  if (dueDate < today) {
+  if (dueDate < todayDate) {
     errors.value.due_date = 'La fecha debe ser hoy o posterior'
     isValid = false
   } else {
@@ -110,12 +119,14 @@ const validateForm = (): boolean => {
 }
 
 /**
- * Maneja cambio de fecha
+ * ✅ NUEVO: Maneja cambio de fecha y cierra el calendario
  */
 const handleDateUpdate = (value: DateValue | undefined): void => {
   if (!value) return
   formData.value.due_date = value.toString()
   errors.value.due_date = ''
+  // Cerrar el popover automáticamente
+  isCalendarOpen.value = false
 }
 
 /**
@@ -143,7 +154,7 @@ const formatDateForDisplay = (dateString: string | undefined): string => {
 }
 
 /**
- * Guarda los cambios
+ * ✅ ACTUALIZADO: Guarda los cambios usando el store de Pinia
  */
 const handleSubmit = async (): Promise<void> => {
   if (!validateForm()) {
@@ -154,8 +165,7 @@ const handleSubmit = async (): Promise<void> => {
   isSubmitting.value = true
 
   try {
-    await taskService.update({
-      id: props.task.id,
+    await tasksStore.updateTask(props.task.id, {
       description: formData.value.description,
       priority: formData.value.priority,
       due_date: formData.value.due_date,
@@ -166,12 +176,10 @@ const handleSubmit = async (): Promise<void> => {
       notes: formData.value.notes || undefined,
     })
 
-    toast.success('Tarea actualizada exitosamente')
     emit('updated')
     isOpen.value = false
   } catch (error: unknown) {
     console.error(error)
-    toast.error((error as Error).message || 'Error al actualizar la tarea')
   } finally {
     isSubmitting.value = false
   }
@@ -200,7 +208,7 @@ watch(isOpen, (newValue) => {
 <template>
   <Dialog v-model:open="isOpen">
     <DialogTrigger as-child>
-      <Button variant="outline">
+      <Button :disabled="!canEdit" variant="outline">
         <Edit class="h-4 w-4 mr-2" />
         Editar Tarea
       </Button>
@@ -210,6 +218,9 @@ watch(isOpen, (newValue) => {
         <DialogTitle>Editar Tarea</DialogTitle>
         <DialogDescription>
           Modifica los detalles de la tarea #{{ task.id.substring(0, 8) }}
+          <span v-if="!canEdit" class="block text-destructive mt-1">
+            ⚠️ No se puede editar una tarea completada o cancelada
+          </span>
         </DialogDescription>
       </DialogHeader>
 
@@ -221,6 +232,7 @@ watch(isOpen, (newValue) => {
             id="description"
             v-model="formData.description"
             :class="{ 'border-destructive': errors.description }"
+            :disabled="!canEdit"
             placeholder="Describe el problema..."
             rows="4"
           />
@@ -234,7 +246,7 @@ watch(isOpen, (newValue) => {
           <!-- Prioridad -->
           <div class="space-y-2">
             <Label>Prioridad *</Label>
-            <Select v-model="formData.priority">
+            <Select v-model="formData.priority" :disabled="!canEdit">
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -249,7 +261,7 @@ watch(isOpen, (newValue) => {
           <!-- Fecha de Vencimiento -->
           <div class="space-y-2">
             <Label>Fecha de Vencimiento *</Label>
-            <Popover>
+            <Popover v-model:open="isCalendarOpen">
               <PopoverTrigger as-child>
                 <Button
                   :class="
@@ -259,6 +271,7 @@ watch(isOpen, (newValue) => {
                       errors.due_date && 'border-destructive',
                     )
                   "
+                  :disabled="!canEdit"
                   type="button"
                   variant="outline"
                 >
@@ -290,6 +303,7 @@ watch(isOpen, (newValue) => {
             <Input
               id="estimated_cost"
               v-model="formData.estimated_cost"
+              :disabled="!canEdit"
               min="0"
               placeholder="0.00"
               step="0.01"
@@ -303,6 +317,7 @@ watch(isOpen, (newValue) => {
             <Input
               id="assigned_to"
               v-model="formData.assigned_to"
+              :disabled="!canEdit"
               placeholder="Nombre del responsable"
             />
           </div>
@@ -314,6 +329,7 @@ watch(isOpen, (newValue) => {
           <Textarea
             id="notes"
             v-model="formData.notes"
+            :disabled="!canEdit"
             placeholder="Notas opcionales..."
             rows="3"
           />
@@ -322,7 +338,7 @@ watch(isOpen, (newValue) => {
 
       <DialogFooter>
         <Button type="button" variant="outline" @click="isOpen = false">Cancelar</Button>
-        <Button :disabled="isSubmitting" type="button" @click="handleSubmit">
+        <Button :disabled="isSubmitting || !canEdit" type="button" @click="handleSubmit">
           {{ isSubmitting ? 'Guardando...' : 'Guardar Cambios' }}
         </Button>
       </DialogFooter>
