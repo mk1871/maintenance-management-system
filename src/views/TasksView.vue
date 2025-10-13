@@ -40,14 +40,17 @@ const priorityFilter = ref('all')
 const filteredTasks = computed((): TaskWithRelations[] => {
   let filtered = [...tasksStore.tasks]
 
+  // ✅ CORRECCIÓN: Usar 'description' en lugar de 'title'
   // Filtro de búsqueda
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter((task) =>
-      task.title.toLowerCase().includes(query) ||
-      task.description?.toLowerCase().includes(query) ||
-      task.accommodation?.code.toLowerCase().includes(query) ||
-      task.accommodation?.name.toLowerCase().includes(query)
+    filtered = filtered.filter(
+      (task) =>
+        task.description.toLowerCase().includes(query) ||
+        task.area_label?.toLowerCase().includes(query) ||
+        task.element_name?.toLowerCase().includes(query) ||
+        task.accommodation?.code.toLowerCase().includes(query) ||
+        task.accommodation?.name.toLowerCase().includes(query),
     )
   }
 
@@ -82,17 +85,22 @@ const handleTaskCreated = (): void => {
 }
 
 /**
+ * ✅ CORRECCIÓN: Recibir taskId (string) y buscar la tarea en el store
  * Navega al detalle de una tarea
  */
-const handleViewTask = (task: TaskWithRelations): void => {
-  router.push({ name: 'TaskDetail', params: { id: task.id } })
+const handleViewTask = (taskId: string): void => {
+  router.push({ name: 'TaskDetail', params: { id: taskId } })
 }
 
 /**
+ * ✅ CORRECCIÓN: Recibir taskId (string) y buscar la tarea en el store
  * Inicia el proceso de eliminación
  */
-const handleDeleteTask = (task: TaskWithRelations): void => {
-  taskToDelete.value = task
+const handleDeleteTask = (taskId: string): void => {
+  const task = tasksStore.tasks.find((t) => t.id === taskId)
+  if (task) {
+    taskToDelete.value = task
+  }
 }
 
 /**
@@ -132,6 +140,7 @@ onMounted(async () => {
       @task-created="handleTaskCreated"
     />
 
+    <!-- ✅ RECUPERADO: Pasando stats desde el store -->
     <TasksStats :stats="tasksStore.stats" />
 
     <Separator />
@@ -155,8 +164,9 @@ onMounted(async () => {
         <AlertDialogHeader>
           <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
           <AlertDialogDescription>
+            <!-- ✅ CORRECCIÓN: Usar 'description' en lugar de 'title' -->
             Esta acción no se puede deshacer. Se eliminará permanentemente la tarea
-            <span v-if="taskToDelete" class="font-semibold">"{{ taskToDelete.title }}"</span>.
+            <span v-if="taskToDelete" class="font-semibold">"{{ taskToDelete.description }}"</span>.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
