@@ -90,10 +90,13 @@ export const useAccommodationForm = () => {
 
   /**
    * Maneja errores de API de forma consistente
+   * @param error - Error capturado
+   * @param context - Contexto de la operación (opcional)
    */
-  const handleApiError = (error: unknown, context: string): void => {
-    console.error(`Error en ${context}:`, error)
-    const message = (error as Error).message || `Error al ${context}`
+  const handleApiError = (error: unknown, context?: string): void => {
+    const contextMsg = context ? `Error al ${context}` : 'Error en operación'
+    console.error(contextMsg, error)
+    const message = (error as Error).message || contextMsg
     toast.error(message)
   }
 

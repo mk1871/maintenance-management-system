@@ -25,13 +25,14 @@ export interface Accommodation {
   updated_at: string
 }
 
+// ✅ CORRECCIÓN 1: configured_areas ahora es opcional
 export interface CreateAccommodationData {
   code: string
   name: string
   address?: string
   notes?: string
   status?: AccommodationStatus
-  configured_areas: Record<string, string[]>
+  configured_areas?: Record<string, string[]> // ← Cambiado a opcional
 }
 
 export interface UpdateAccommodationData {
@@ -80,9 +81,8 @@ const validateCreateData = (data: CreateAccommodationData): void => {
     throw new Error(`El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`)
   }
 
-  if (!data.configured_areas || Object.keys(data.configured_areas).length === 0) {
-    throw new Error('Debe configurar al menos un área')
-  }
+  // ✅ CORRECCIÓN 2: Eliminada validación de configured_areas
+  // Las áreas se manejan en accommodation_areas (tabla separada)
 }
 
 /**
@@ -95,7 +95,8 @@ const validateUpdateData = (data: UpdateAccommodationData): void => {
     throw new Error(`El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`)
   }
 
-  if (data.configured_areas && Object.keys(data.configured_areas).length === 0) {
+  // ✅ CORRECCIÓN 3: Validación de configured_areas ahora permite undefined
+  if (data.configured_areas !== undefined && Object.keys(data.configured_areas).length === 0) {
     throw new Error('Debe configurar al menos un área')
   }
 }
@@ -203,6 +204,7 @@ export const accommodationService = {
       address: accommodationData.address?.trim(),
       notes: accommodationData.notes?.trim(),
       status: accommodationData.status || ('active' as AccommodationStatus),
+      configured_areas: accommodationData.configured_areas || {}, // ✅ Default a objeto vacío
       created_by: userId,
     }
 
