@@ -1,8 +1,6 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { Info } from 'lucide-vue-next'
-
 import {
   Dialog,
   DialogContent,
@@ -14,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -21,149 +20,140 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { Spinner } from '@/components/ui/spinner'
-import { Badge } from '@/components/ui/badge'
 
-import { accommodationService, type Accommodation } from '@/composables/accommodationService'
+import { useAccommodationsStore } from '@/stores/accommodations'
+import type { Accommodation } from '@/composables/accommodationService'
 
-// Props
 const props = defineProps<{
-  accommodation: Accommodation | null
+  accommodation: Accommodation
   open: boolean
 }>()
 
-// Emits
 const emit = defineEmits<{
-  (e: 'update:open', value: boolean): void
   (e: 'updated'): void
+  (e: 'update:open', value: boolean): void
 }>()
 
-// Interfaces
 interface FormData {
+  code: string
   name: string
   address: string
-  notes: string
   status: 'active' | 'inactive'
+  notes: string
 }
 
 interface FormErrors {
+  code: string
   name: string
-  address: string
 }
 
-// State
+const MIN_CODE_LENGTH = 1
+const MAX_CODE_LENGTH = 4
+const MIN_NAME_LENGTH = 3
+const CODE_PATTERN = /^[A-Z0-9]+$/
+
+const accommodationsStore = useAccommodationsStore()
+
 const formData = ref<FormData>({
+  code: '',
   name: '',
   address: '',
-  notes: '',
   status: 'active',
+  notes: '',
 })
 
 const errors = ref<FormErrors>({
+  code: '',
   name: '',
-  address: '',
 })
 
-const isSaving = ref(false)
+const isSubmitting = ref(false)
 
 /**
- * Inicializa el formulario con los datos del alojamiento
+ * Inicializa el formulario con los datos del accommodation
  */
 const initializeForm = (): void => {
-  if (!props.accommodation) return
-
   formData.value = {
-    name: props.accommodation.name || '',
+    code: props.accommodation.code,
+    name: props.accommodation.name,
     address: props.accommodation.address || '',
+    status: props.accommodation.status,
     notes: props.accommodation.notes || '',
-    status: props.accommodation.status || 'active',
   }
-
-  // Limpiar errores
-  errors.value = {
-    name: '',
-    address: '',
-  }
+  errors.value = { code: '', name: '' }
 }
 
 /**
  * Valida el formulario
  */
 const validateForm = (): boolean => {
+  errors.value = { code: '', name: '' }
   let isValid = true
 
-  // Validar nombre
-  if (!formData.value.name || formData.value.name.trim().length < 3) {
-    errors.value.name = 'El nombre debe tener al menos 3 caracteres'
+  // Validar código
+  if (!formData.value.code.trim()) {
+    errors.value.code = 'El código es requerido'
     isValid = false
-  } else {
-    errors.value.name = ''
+  } else if (
+    formData.value.code.length < MIN_CODE_LENGTH ||
+    formData.value.code.length > MAX_CODE_LENGTH
+  ) {
+    errors.value.code = `El código debe tener entre ${MIN_CODE_LENGTH} y ${MAX_CODE_LENGTH} caracteres`
+    isValid = false
+  } else if (!CODE_PATTERN.test(formData.value.code)) {
+    errors.value.code = 'El código solo puede contener letras mayúsculas y números'
+    isValid = false
+  }
+
+  // Validar nombre
+  if (!formData.value.name.trim()) {
+    errors.value.name = 'El nombre es requerido'
+    isValid = false
+  } else if (formData.value.name.length < MIN_NAME_LENGTH) {
+    errors.value.name = `El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`
+    isValid = false
   }
 
   return isValid
 }
 
 /**
- * Guarda los cambios del alojamiento
+ * Maneja el submit del formulario
  */
-const handleSave = async (): Promise<void> => {
-  if (!props.accommodation) return
-
+const handleSubmit = async (): Promise<void> => {
   if (!validateForm()) {
-    toast.error('Por favor, corrige los errores del formulario')
+    toast.error('Por favor corrige los errores del formulario')
     return
   }
 
-  isSaving.value = true
-
   try {
-    await accommodationService.update({
-      id: props.accommodation.id,
-      name: formData.value.name.trim(),
-      address: formData.value.address.trim() || undefined,
-      notes: formData.value.notes.trim() || undefined,
+    isSubmitting.value = true
+
+    await accommodationsStore.updateAccommodation(props.accommodation.id, {
+      code: formData.value.code.toUpperCase(),
+      name: formData.value.name,
+      address: formData.value.address || undefined,
       status: formData.value.status,
+      notes: formData.value.notes || undefined,
     })
 
-    toast.success('Alojamiento actualizado exitosamente')
     emit('updated')
-    closeDialog()
   } catch (error: unknown) {
     console.error(error)
-    const errorMessage = (error as Error).message || 'Error al actualizar el alojamiento'
-    toast.error(errorMessage)
+    toast.error('Error al actualizar el alojamiento')
   } finally {
-    isSaving.value = false
+    isSubmitting.value = false
   }
 }
 
 /**
  * Cierra el dialog
  */
-const closeDialog = (): void => {
+const handleClose = (): void => {
   emit('update:open', false)
 }
 
-/**
- * Obtiene la variante del badge según el estado
- */
-const getStatusVariant = (status: string): 'default' | 'secondary' => {
-  return status === 'active' ? 'default' : 'secondary'
-}
-
-/**
- * Obtiene el label del estado
- */
-const getStatusLabel = (status: string): string => {
-  const labels: Record<string, string> = {
-    active: 'Activo',
-    inactive: 'Inactivo',
-  }
-  return labels[status] || status
-}
-
-// Watch para inicializar el formulario cuando se abre el dialog
 watch(
   () => props.open,
   (isOpen) => {
@@ -173,38 +163,42 @@ watch(
   },
   { immediate: true },
 )
-
-// Watch para re-inicializar si cambia el accommodation
-watch(
-  () => props.accommodation,
-  () => {
-    if (props.open) {
-      initializeForm()
-    }
-  },
-)
 </script>
 
 <template>
-  <Dialog :open="props.open" @update:open="closeDialog">
-    <DialogContent class="sm:max-w-[600px]">
+  <Dialog :open="open" @update:open="(value) => emit('update:open', value)">
+    <DialogContent class="max-w-2xl">
       <DialogHeader>
         <DialogTitle>Editar Alojamiento</DialogTitle>
         <DialogDescription>
-          Código: <strong>{{ props.accommodation?.code }}</strong> (no editable)
+          Modifica los datos del alojamiento {{ accommodation.code }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-4 py-4">
+        <!-- Código -->
+        <div class="space-y-2">
+          <Label for="edit-code">Código *</Label>
+          <Input
+            id="edit-code"
+            v-model="formData.code"
+            :class="{ 'border-destructive': errors.code }"
+            maxlength="4"
+            placeholder="Ej: A101"
+          />
+          <p v-if="errors.code" class="text-sm font-medium text-destructive">
+            {{ errors.code }}
+          </p>
+        </div>
+
         <!-- Nombre -->
         <div class="space-y-2">
-          <Label for="name"> Nombre * </Label>
+          <Label for="edit-name">Nombre *</Label>
           <Input
-            id="name"
+            id="edit-name"
             v-model="formData.name"
             :class="{ 'border-destructive': errors.name }"
             placeholder="Nombre del alojamiento"
-            type="text"
           />
           <p v-if="errors.name" class="text-sm font-medium text-destructive">
             {{ errors.name }}
@@ -213,72 +207,41 @@ watch(
 
         <!-- Dirección -->
         <div class="space-y-2">
-          <Label for="address"> Dirección </Label>
-          <Input
-            id="address"
-            v-model="formData.address"
-            placeholder="Dirección completa"
-            type="text"
-          />
-          <p class="text-xs text-muted-foreground">Opcional</p>
+          <Label for="edit-address">Dirección</Label>
+          <Input id="edit-address" v-model="formData.address" placeholder="Dirección completa" />
         </div>
 
         <!-- Estado -->
         <div class="space-y-2">
-          <Label>Estado</Label>
-          <Select v-model="formData.status">
+          <Label for="edit-status">Estado</Label>
+          <Select id="edit-status" v-model="formData.status">
             <SelectTrigger>
-              <SelectValue>
-                <Badge :variant="getStatusVariant(formData.status)">
-                  {{ getStatusLabel(formData.status) }}
-                </Badge>
-              </SelectValue>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">
-                <Badge variant="default">Activo</Badge>
-              </SelectItem>
-              <SelectItem value="inactive">
-                <Badge variant="secondary">Inactivo</Badge>
-              </SelectItem>
+              <SelectItem value="active">Activo</SelectItem>
+              <SelectItem value="inactive">Inactivo</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <!-- Notas -->
         <div class="space-y-2">
-          <Label for="notes"> Notas </Label>
+          <Label for="edit-notes">Notas</Label>
           <Textarea
-            id="notes"
+            id="edit-notes"
             v-model="formData.notes"
-            placeholder="Notas adicionales sobre el alojamiento..."
+            placeholder="Notas adicionales..."
             rows="3"
           />
-          <p class="text-xs text-muted-foreground">Opcional</p>
-        </div>
-
-        <!-- Aviso sobre áreas -->
-        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-          <div class="flex items-start gap-2">
-            <Info class="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <div>
-              <p class="font-medium">Nota sobre áreas configuradas</p>
-              <p class="mt-1 text-xs">
-                La edición de áreas y elementos se realizará en una funcionalidad futura dedicada
-                para evitar inconsistencias en tareas existentes.
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
-      <DialogFooter class="gap-2">
-        <Button :disabled="isSaving" type="button" variant="outline" @click="closeDialog">
-          Cancelar
-        </Button>
-        <Button :disabled="isSaving" @click="handleSave">
-          <Spinner v-if="isSaving" class="mr-2 h-4 w-4" />
-          {{ isSaving ? 'Guardando...' : 'Guardar Cambios' }}
+      <DialogFooter>
+        <Button variant="outline" @click="handleClose"> Cancelar </Button>
+        <Button :disabled="isSubmitting" @click="handleSubmit">
+          <Spinner v-if="isSubmitting" class="mr-2 h-4 w-4" />
+          {{ isSubmitting ? 'Actualizando...' : 'Actualizar' }}
         </Button>
       </DialogFooter>
     </DialogContent>

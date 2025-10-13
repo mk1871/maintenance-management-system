@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { Separator } from '@/components/ui/separator'
@@ -7,56 +7,35 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Building2, CheckCircle, XCircle } from 'lucide-vue-next'
 
 import AccommodationList from '@/components/accommodations/AccommodationList.vue'
-import AccommodationForm from '@/components/accommodations/AccommodationForm.vue'
+import AccommodationFormDialog from '@/components/accommodations/AccommodationFormDialog.vue'
 import AccommodationEditDialog from '@/components/accommodations/AccommodationEditDialog.vue'
 
+import { useAccommodationsStore } from '@/stores/accommodations'
 import { accommodationService, type Accommodation } from '@/composables/accommodationService'
-import { useAccommodationForm } from '@/composables/useAccommodationForm'
 
 const route = useRoute()
 const router = useRouter()
-const { handleApiError } = useAccommodationForm()
+const accommodationsStore = useAccommodationsStore()
 
-const accommodations = ref<Accommodation[]>([])
-const isLoading = ref(true)
 const selectedAccommodation = ref<Accommodation | null>(null)
 const showEditDialog = ref(false)
 
-const stats = ref({
-  total: 0,
-  active: 0,
-  inactive: 0,
-})
-
 /**
- * Carga la lista de accommodations
+ * Estadísticas computadas desde el store
  */
-const loadAccommodations = async (): Promise<void> => {
-  isLoading.value = true
-  try {
-    accommodations.value = await accommodationService.getAll()
-    calculateStats()
-  } catch (error: unknown) {
-    handleApiError(error, 'cargar alojamientos')
-  } finally {
-    isLoading.value = false
-  }
-}
-
-/**
- * Calcula estadísticas de accommodations
- */
-const calculateStats = (): void => {
-  stats.value.total = accommodations.value.length
-  stats.value.active = accommodations.value.filter((acc) => acc.status === 'active').length
-  stats.value.inactive = accommodations.value.filter((acc) => acc.status === 'inactive').length
-}
+const stats = computed(() => ({
+  total: accommodationsStore.accommodationCount,
+  active: accommodationsStore.activeAccommodations.length,
+  inactive:
+    accommodationsStore.accommodationCount - accommodationsStore.activeAccommodations.length,
+}))
 
 /**
  * Maneja la creación exitosa de un accommodation
  */
 const handleAccommodationCreated = (): void => {
-  loadAccommodations()
+  // El store ya actualizó la lista automáticamente
+  toast.success('Alojamiento creado exitosamente')
 }
 
 /**
@@ -80,15 +59,14 @@ const closeEditDialog = (): void => {
  */
 const handleAccommodationUpdated = (): void => {
   closeEditDialog()
-  loadAccommodations()
-  toast.success('Alojamiento actualizado exitosamente')
+  // El store ya actualizó la lista automáticamente
 }
 
 /**
  * Maneja el refresh de la lista
  */
-const handleRefresh = (): void => {
-  loadAccommodations()
+const handleRefresh = async (): Promise<void> => {
+  await accommodationsStore.fetchAccommodations()
 }
 
 /**
@@ -114,14 +92,14 @@ const handleQueryParams = async (): Promise<void> => {
 watch(
   () => route.query.edit,
   (editId) => {
-    if (editId && accommodations.value.length > 0) {
+    if (editId && accommodationsStore.accommodations.length > 0) {
       handleQueryParams()
     }
   },
 )
 
 onMounted(async () => {
-  await loadAccommodations()
+  await accommodationsStore.fetchAccommodations()
   await handleQueryParams()
 })
 </script>
@@ -172,13 +150,13 @@ onMounted(async () => {
     <!-- Toolbar -->
     <div class="flex items-center justify-between">
       <h2 class="text-xl font-semibold">Lista de Alojamientos</h2>
-      <AccommodationForm @accommodation-created="handleAccommodationCreated" />
+      <AccommodationFormDialog @accommodation-created="handleAccommodationCreated" />
     </div>
 
     <!-- Lista -->
     <AccommodationList
-      :accommodations="accommodations"
-      :is-loading="isLoading"
+      :accommodations="accommodationsStore.accommodations"
+      :is-loading="accommodationsStore.isLoading"
       @edit="handleEdit"
       @refresh="handleRefresh"
     />

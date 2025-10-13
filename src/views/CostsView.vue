@@ -9,8 +9,8 @@ import CostsFilters from '@/components/costs/CostsFilters.vue'
 import CostsStats from '@/components/costs/CostsStats.vue'
 import CostsTable from '@/components/costs/CostsTable.vue'
 
-import { costService, type Cost } from '@/composables/costService'
-import { accommodationService, type Accommodation } from '@/composables/accommodationService'
+import { useCostsStore } from '@/stores/costs'
+import { useAccommodationsStore } from '@/stores/accommodations'
 import {
   exportToCSV,
   exportToPDF,
@@ -21,10 +21,9 @@ import {
 
 const TIME_ZONE = getLocalTimeZone()
 
-// Estado de datos
-const costs = ref<Cost[]>([])
-const accommodations = ref<Accommodation[]>([])
-const isLoading = ref(true)
+const costsStore = useCostsStore()
+const accommodationsStore = useAccommodationsStore()
+
 const isRefreshing = ref(false)
 
 // Filtros
@@ -36,32 +35,16 @@ const filters = ref({
   minAmount: '',
 })
 
-/**
- * Carga los datos iniciales
- */
-const loadData = async (): Promise<void> => {
-  try {
-    isLoading.value = true
-    const [costsData, accommodationsData] = await Promise.all([
-      costService.getAll(),
-      accommodationService.getAll(),
-    ])
-    costs.value = costsData
-    accommodations.value = accommodationsData
-  } catch (error: unknown) {
-    console.error(error)
-    toast.error('Error al cargar los costos')
-  } finally {
-    isLoading.value = false
-  }
-}
+// Computed values con type assertion correcta
+const startDateValue = computed<DateValue | undefined>(() => filters.value.startDate as DateValue | undefined)
+const endDateValue = computed<DateValue | undefined>(() => filters.value.endDate as DateValue | undefined)
 
 /**
  * Refresca los datos
  */
 const handleRefresh = async (): Promise<void> => {
   isRefreshing.value = true
-  await loadData()
+  await costsStore.fetchCosts()
   isRefreshing.value = false
   toast.success('Costos actualizados')
 }
@@ -83,7 +66,7 @@ const clearFilters = (): void => {
  * Costos filtrados según criterios
  */
 const filteredCosts = computed(() => {
-  let result = [...costs.value]
+  let result = [...costsStore.costs]
 
   if (filters.value.startDate) {
     const startDate = filters.value.startDate.toDate(TIME_ZONE)
@@ -123,7 +106,7 @@ const filteredTotal = computed(() => {
  * Obtiene el código del alojamiento
  */
 const getAccommodationCode = (accommodationId: string): string => {
-  const accommodation = accommodations.value.find((acc) => acc.id === accommodationId)
+  const accommodation = accommodationsStore.accommodations.find((acc) => acc.id === accommodationId)
   return accommodation?.code ?? 'N/A'
 }
 
@@ -160,8 +143,17 @@ const handleExportCSV = (): void => {
       categoria: formatCostCategory(cost.category),
     }))
 
-    const filename = generateFilename('costos', 'csv')
-    exportToCSV(exportData, filename)
+    const headers = {
+      fecha: 'Fecha',
+      alojamiento: 'Alojamiento',
+      tarea: 'Tarea ID',
+      descripcion: 'Descripción',
+      cantidad: 'Cantidad (€)',
+      categoria: 'Categoría',
+    }
+
+    const filename = generateFilename('costos')
+    exportToCSV(exportData, filename, headers)
 
     toast.success('CSV exportado exitosamente')
   } catch (error: unknown) {
@@ -205,7 +197,10 @@ const handleExportPDF = (): void => {
 }
 
 onMounted(async () => {
-  await loadData()
+  await Promise.all([
+    costsStore.fetchCosts(),
+    accommodationsStore.fetchAccommodations(),
+  ])
 })
 </script>
 
@@ -220,21 +215,25 @@ onMounted(async () => {
 
     <CostsFilters
       :accommodation-id="filters.accommodationId"
-      :accommodations="accommodations"
+      :accommodations="accommodationsStore.accommodations"
       :category="filters.category"
-      :end-date="filters.endDate"
+      :end-date="endDateValue"
       :min-amount="filters.minAmount"
-      :start-date="filters.startDate"
+      :start-date="startDateValue"
       @clear="clearFilters"
       @update:start-date="(val) => (filters.startDate = val)"
       @update:end-date="(val) => (filters.endDate = val)"
       @update:accommodation-id="(val) => (filters.accommodationId = val)"
       @update:category="(val) => (filters.category = val)"
-      @update:min-amount="(val) => (filters.minAmount = val)"
+      @update:min-amount="(val) => (filters.minAmount = String(val))"
     />
 
-    <CostsStats :costs="costs" />
+    <CostsStats :costs="costsStore.costs" />
 
-    <CostsTable :accommodations="accommodations" :costs="filteredCosts" :is-loading="isLoading" />
+    <CostsTable
+      :accommodations="accommodationsStore.accommodations"
+      :costs="filteredCosts"
+      :is-loading="costsStore.isLoading"
+    />
   </div>
 </template>
