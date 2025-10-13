@@ -6,8 +6,8 @@ import { Separator } from '@/components/ui/separator'
 import { Card, CardContent } from '@/components/ui/card'
 import { Building2, CheckCircle, XCircle } from 'lucide-vue-next'
 
+import AccommodationsHeader from '@/components/accommodations/AccommodationsHeader.vue'
 import AccommodationList from '@/components/accommodations/AccommodationList.vue'
-import AccommodationFormDialog from '@/components/accommodations/AccommodationFormDialog.vue'
 import AccommodationEditDialog from '@/components/accommodations/AccommodationEditDialog.vue'
 
 import { useAccommodationsStore } from '@/stores/accommodations'
@@ -19,6 +19,7 @@ const accommodationsStore = useAccommodationsStore()
 
 const selectedAccommodation = ref<Accommodation | null>(null)
 const showEditDialog = ref(false)
+const isRefreshing = ref(false)
 
 /**
  * Estadísticas computadas desde el store
@@ -34,7 +35,6 @@ const stats = computed(() => ({
  * Maneja la creación exitosa de un accommodation
  */
 const handleAccommodationCreated = (): void => {
-  // El store ya actualizó la lista automáticamente
   toast.success('Alojamiento creado exitosamente')
 }
 
@@ -59,14 +59,22 @@ const closeEditDialog = (): void => {
  */
 const handleAccommodationUpdated = (): void => {
   closeEditDialog()
-  // El store ya actualizó la lista automáticamente
 }
 
 /**
  * Maneja el refresh de la lista
  */
 const handleRefresh = async (): Promise<void> => {
-  await accommodationsStore.fetchAccommodations()
+  isRefreshing.value = true
+  try {
+    await accommodationsStore.fetchAccommodations()
+    toast.success('Datos actualizados')
+  } catch (error: unknown) {
+    console.error('Error al actualizar:', error)
+    toast.error('Error al actualizar los datos')
+  } finally {
+    isRefreshing.value = false
+  }
 }
 
 /**
@@ -106,11 +114,12 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div>
-      <h1 class="text-3xl font-bold tracking-tight">Alojamientos</h1>
-      <p class="text-muted-foreground">Gestiona todos los alojamientos del sistema</p>
-    </div>
+    <!-- Header con botones integrados -->
+    <AccommodationsHeader
+      :is-refreshing="isRefreshing"
+      @refresh="handleRefresh"
+      @accommodation-created="handleAccommodationCreated"
+    />
 
     <!-- Estadísticas con Card oficial -->
     <div class="grid gap-4 md:grid-cols-3">
@@ -147,13 +156,7 @@ onMounted(async () => {
 
     <Separator />
 
-    <!-- Toolbar -->
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-semibold">Lista de Alojamientos</h2>
-      <AccommodationFormDialog @accommodation-created="handleAccommodationCreated" />
-    </div>
-
-    <!-- Lista -->
+    <!-- Lista sin toolbar redundante -->
     <AccommodationList
       :accommodations="accommodationsStore.accommodations"
       :is-loading="accommodationsStore.isLoading"
