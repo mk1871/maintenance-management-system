@@ -91,9 +91,6 @@ const closeMobileMenu = (): void => {
 
   <SidebarProvider v-else>
     <div v-if="authStore.isAuthenticated" class="flex h-screen w-full">
-      <!-- ========================================
-           SIDEBAR DESKTOP (componentes oficiales shadcn-vue)
-           ======================================== -->
       <Sidebar class="hidden md:flex" collapsible="icon">
         <SidebarHeader class="border-b">
           <div class="flex items-center justify-between p-4">

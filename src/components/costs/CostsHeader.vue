@@ -17,7 +17,7 @@ const emit = defineEmits<{
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-3xl font-bold tracking-tight">Costos</h1>
-      <p class="text-muted-foreground mt-1">Gestiona y analiza todos los costos de mantenimiento</p>
+      <p class="text-muted-foreground">Gestiona y analiza todos los costos de mantenimiento</p>
     </div>
     <div class="flex items-center gap-2">
       <Button
