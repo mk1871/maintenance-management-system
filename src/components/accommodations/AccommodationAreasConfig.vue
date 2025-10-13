@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { TriangleAlert } from 'lucide-vue-next'
 import AreaSelector, { type SelectedArea } from '@/components/accommodations/AreaSelector.vue'
-import AreaElementsConfig, { type SelectedElement } from '@/components/accommodations/AreaElementsConfig.vue'
+import AreaElementsConfig, {
+  type SelectedElement,
+} from '@/components/accommodations/AreaElementsConfig.vue'
 import type { AreaCatalog, ElementCatalog } from '@/composables/areaCatalogService'
 
 defineProps<{
@@ -17,9 +19,13 @@ const selectedElements = defineModel<SelectedElement[]>('selectedElements', { re
 
 const showConfigSection = ref(false)
 
-watch(selectedAreas, (newAreas) => {
-  showConfigSection.value = newAreas.length > 0
-}, { immediate: true })
+watch(
+  selectedAreas,
+  (newAreas) => {
+    showConfigSection.value = newAreas.length > 0
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -28,15 +34,10 @@ watch(selectedAreas, (newAreas) => {
     <Card>
       <CardHeader>
         <CardTitle>Áreas del Alojamiento</CardTitle>
-        <CardDescription>
-          Selecciona las áreas que existen en este alojamiento
-        </CardDescription>
+        <CardDescription> Selecciona las áreas que existen en este alojamiento </CardDescription>
       </CardHeader>
       <CardContent>
-        <AreaSelector
-          v-model="selectedAreas"
-          :area-catalog="areaCatalog"
-        />
+        <AreaSelector v-model="selectedAreas" :options="areaCatalog" />
       </CardContent>
     </Card>
 
@@ -44,15 +45,13 @@ watch(selectedAreas, (newAreas) => {
     <div v-if="showConfigSection">
       <Alert>
         <TriangleAlert class="h-4 w-4" />
-        <AlertDescription>
-          Configura los elementos para cada área seleccionada
-        </AlertDescription>
+        <AlertDescription> Configura los elementos para cada área seleccionada </AlertDescription>
       </Alert>
 
       <div class="mt-4">
         <AreaElementsConfig
           v-model="selectedElements"
-          :element-catalog-map="elementCatalogMap"
+          :element-catalog="elementCatalogMap"
           :selected-areas="selectedAreas"
         />
       </div>
