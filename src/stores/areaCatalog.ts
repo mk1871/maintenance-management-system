@@ -22,7 +22,7 @@ export const useAreaCatalogStore = defineStore('areaCatalog', () => {
     const map = new Map<string, ElementCatalog[]>()
     areas.value.forEach((area) => {
       if (area.elements && area.elements.length > 0) {
-        map.set(area.key, area.elements)
+        map.set(area.id, area.elements)
       }
     })
     return map
@@ -30,8 +30,8 @@ export const useAreaCatalogStore = defineStore('areaCatalog', () => {
 
   const areaCount = computed(() => areas.value.length)
 
-  const getElementsForArea = (areaKey: string): ElementCatalog[] => {
-    return elementsByArea.value.get(areaKey) ?? []
+  const getElementsForArea = (areaId: string): ElementCatalog[] => {
+    return elementsByArea.value.get(areaId) ?? []
   }
 
   // Actions

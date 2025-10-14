@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -9,106 +9,115 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
-interface FormData {
-  code: string
-  name: string
-  address: string
-  status: 'active' | 'inactive'
-  notes: string
-}
-
-interface FormErrors {
-  code: string
-  name: string
-}
-
-defineProps<{
-  formData: FormData
-  errors: FormErrors
-}>()
-
-const emit = defineEmits<{
-  (e: 'update:code', value: string): void
-  (e: 'update:name', value: string): void
-  (e: 'update:address', value: string): void
-  (e: 'update:status', value: 'active' | 'inactive'): void
-  (e: 'update:notes', value: string): void
-}>()
+/**
+ * Componente para campos básicos del formulario de Accommodation
+ * Usa FormField de shadcn-vue para validación automática
+ * No recibe props, se conecta automáticamente al formulario padre
+ */
 </script>
 
 <template>
-  <div class="grid gap-4 py-4">
-    <!-- Código -->
-    <div class="space-y-2">
-      <Label for="code">Código *</Label>
-      <Input
-        id="code"
-        :class="{ 'border-destructive': errors.code }"
-        :model-value="formData.code"
-        maxlength="4"
-        placeholder="Ej: A101"
-        @update:model-value="(val) => emit('update:code', String(val))"
-      />
-      <p v-if="errors.code" class="text-sm font-medium text-destructive">
-        {{ errors.code }}
-      </p>
-    </div>
+  <div class="space-y-4">
+    <!-- Código del Alojamiento -->
+    <FormField v-slot="{ componentField }" name="code">
+      <FormItem>
+        <FormLabel>Código *</FormLabel>
+        <FormControl>
+          <Input
+            class="uppercase"
+            maxlength="4"
+            placeholder="Ej: A101"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          Código único del alojamiento (1-4 caracteres, solo mayúsculas y números)
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
-    <!-- Nombre -->
-    <div class="space-y-2">
-      <Label for="name">Nombre *</Label>
-      <Input
-        id="name"
-        :class="{ 'border-destructive': errors.name }"
-        :model-value="formData.name"
-        placeholder="Nombre del alojamiento"
-        @update:model-value="(val) => emit('update:name', String(val))"
-      />
-      <p v-if="errors.name" class="text-sm font-medium text-destructive">
-        {{ errors.name }}
-      </p>
-    </div>
+    <!-- Nombre del Alojamiento -->
+    <FormField v-slot="{ componentField }" name="name">
+      <FormItem>
+        <FormLabel>Nombre *</FormLabel>
+        <FormControl>
+          <Input
+            placeholder="Ej: Apartamento Playa Vista"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          Nombre descriptivo del alojamiento (mínimo 3 caracteres)
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <!-- Dirección -->
-    <div class="space-y-2">
-      <Label for="address">Dirección</Label>
-      <Input
-        id="address"
-        :model-value="formData.address"
-        placeholder="Dirección completa"
-        @update:model-value="(val) => emit('update:address', String(val))"
-      />
-    </div>
+    <FormField v-slot="{ componentField }" name="address">
+      <FormItem>
+        <FormLabel>Dirección</FormLabel>
+        <FormControl>
+          <Input
+            placeholder="Ej: Calle 123, Ciudad"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          Dirección física del alojamiento (opcional)
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <!-- Estado -->
-    <div class="space-y-2">
-      <Label for="status">Estado</Label>
-      <Select
-        id="status"
-        :model-value="formData.status"
-        @update:model-value="(val) => val && emit('update:status', String(val) as 'active' | 'inactive')"
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="active">Activo</SelectItem>
-          <SelectItem value="inactive">Inactivo</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+    <FormField v-slot="{ componentField }" name="status">
+      <FormItem>
+        <FormLabel>Estado *</FormLabel>
+        <Select v-bind="componentField">
+          <FormControl>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecciona el estado" />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            <SelectItem value="active">Activo</SelectItem>
+            <SelectItem value="inactive">Inactivo</SelectItem>
+          </SelectContent>
+        </Select>
+        <FormDescription>
+          Estado operativo del alojamiento
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <!-- Notas -->
-    <div class="space-y-2">
-      <Label for="notes">Notas</Label>
-      <Textarea
-        id="notes"
-        :model-value="formData.notes"
-        placeholder="Notas adicionales..."
-        rows="3"
-        @update:model-value="(val) => emit('update:notes', String(val))"
-      />
-    </div>
+    <FormField v-slot="{ componentField }" name="notes">
+      <FormItem>
+        <FormLabel>Notas</FormLabel>
+        <FormControl>
+          <Textarea
+            placeholder="Notas adicionales sobre el alojamiento..."
+            rows="3"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>
+          Información adicional sobre el alojamiento (opcional)
+        </FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
   </div>
 </template>

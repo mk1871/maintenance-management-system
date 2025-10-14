@@ -1,7 +1,9 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
+import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
 import { Plus } from 'lucide-vue-next'
+
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -22,126 +24,113 @@ import type { SelectedElement } from '@/components/accommodations/AreaElementsCo
 import { useAccommodationsStore } from '@/stores/accommodations'
 import { useAreaCatalogStore } from '@/stores/areaCatalog'
 import { useAccommodationForm } from '@/composables/useAccommodationForm'
+import {
+  accommodationValidationSchema,
+  accommodationFullValidationSchema,
+  type AccommodationBasicFormValues,
+} from '@/schemas/accommodationSchema'
 
 const emit = defineEmits<{
   (e: 'accommodation-created'): void
 }>()
 
-interface FormData {
-  code: string
-  name: string
-  address: string
-  status: 'active' | 'inactive'
-  notes: string
-}
-
-interface FormErrors {
-  code: string
-  name: string
-}
-
-const MIN_CODE_LENGTH = 1
-const MAX_CODE_LENGTH = 4
-const MIN_NAME_LENGTH = 3
-const CODE_PATTERN = /^[A-Z0-9]+$/
-
 const accommodationsStore = useAccommodationsStore()
 const areaCatalogStore = useAreaCatalogStore()
 const { saveAreasAndElements, handleApiError } = useAccommodationForm()
-
-const formData = ref<FormData>({
-  code: '',
-  name: '',
-  address: '',
-  status: 'active',
-  notes: '',
-})
-
-const errors = ref<FormErrors>({
-  code: '',
-  name: '',
-})
 
 const selectedAreas = ref<SelectedArea[]>([])
 const selectedElements = ref<SelectedElement[]>([])
 const isDialogOpen = ref(false)
 const isSubmitting = ref(false)
+const isFormValid = computed(() => form.meta.value.valid)
 
 const elementCatalogMap = computed(() => areaCatalogStore.elementsByArea)
 
-const validateForm = (): boolean => {
-  errors.value = { code: '', name: '' }
-  let isValid = true
-
-  // Validar código
-  if (!formData.value.code.trim()) {
-    errors.value.code = 'El código es requerido'
-    isValid = false
-  } else if (formData.value.code.length < MIN_CODE_LENGTH || formData.value.code.length > MAX_CODE_LENGTH) {
-    errors.value.code = `El código debe tener entre ${MIN_CODE_LENGTH} y ${MAX_CODE_LENGTH} caracteres`
-    isValid = false
-  } else if (!CODE_PATTERN.test(formData.value.code)) {
-    errors.value.code = 'El código solo puede contener letras mayúsculas y números'
-    isValid = false
-  }
-
-  // Validar nombre
-  if (!formData.value.name.trim()) {
-    errors.value.name = 'El nombre es requerido'
-    isValid = false
-  } else if (formData.value.name.length < MIN_NAME_LENGTH) {
-    errors.value.name = `El nombre debe tener al menos ${MIN_NAME_LENGTH} caracteres`
-    isValid = false
-  }
-
-  return isValid
-}
-
-const resetForm = (): void => {
-  formData.value = {
+/**
+ * Configuración del formulario con vee-validate + Zod (solo campos básicos)
+ */
+const form = useForm<AccommodationBasicFormValues>({
+  validationSchema: accommodationValidationSchema,
+  initialValues: {
     code: '',
     name: '',
     address: '',
     status: 'active',
     notes: '',
-  }
-  errors.value = { code: '', name: '' }
+  },
+})
+
+/**
+ * Resetea el formulario a valores iniciales
+ */
+const resetForm = (): void => {
+  form.resetForm()
   selectedAreas.value = []
   selectedElements.value = []
 }
 
-const handleSubmit = async (): Promise<void> => {
-  if (!validateForm()) {
-    toast.error('Por favor corrige los errores del formulario')
-    return
+/**
+ * Validación completa con Zod (campos básicos + áreas + elementos)
+ */
+const validateFullForm = async (values: AccommodationBasicFormValues): Promise<boolean> => {
+  const fullData = {
+    ...values,
+    selectedAreas: selectedAreas.value,
+    selectedElements: selectedElements.value,
   }
+
+  const result = accommodationFullValidationSchema.safeParse(fullData)
+
+  if (!result.success) {
+    // ✅ Fail Fast: Validar que exista al menos un error
+    const firstError = result.error.issues[0]
+
+    if (!firstError) {
+      // Caso extremo: error sin issues (no debería pasar)
+      toast.error('Error de validación desconocido')
+      return false
+    }
+
+    toast.error(firstError.message)
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Maneja el submit del formulario con validación robusta
+ */
+const onSubmit = form.handleSubmit(async (values: AccommodationBasicFormValues) => {
+  // Validación completa (incluye áreas/elementos)
+  const isValid = await validateFullForm(values)
+  if (!isValid) return
 
   try {
     isSubmitting.value = true
 
     // Crear alojamiento usando el store
     const accommodation = await accommodationsStore.createAccommodation({
-      code: formData.value.code.toUpperCase(),
-      name: formData.value.name,
-      address: formData.value.address || undefined,
-      status: formData.value.status,
-      notes: formData.value.notes || undefined,
+      code: values.code,
+      name: values.name,
+      address: values.address || undefined,
+      status: values.status,
+      notes: values.notes || undefined,
     })
 
-    // Guardar áreas y elementos
-    if (selectedAreas.value.length > 0) {
-      await saveAreasAndElements(accommodation.id, selectedAreas.value, selectedElements.value)
-    }
+    // Guardar áreas y elementos (siempre hay al menos 1 por validación)
+    await saveAreasAndElements(accommodation.id, selectedAreas.value, selectedElements.value)
 
+    toast.success('Alojamiento creado exitosamente')
     emit('accommodation-created')
     resetForm()
     isDialogOpen.value = false
   } catch (error: unknown) {
-    handleApiError(error)
+    handleApiError(error, 'crear alojamiento')
   } finally {
     isSubmitting.value = false
   }
-}
+})
 
 onMounted(async () => {
   await areaCatalogStore.fetchAreas()
@@ -165,36 +154,28 @@ onMounted(async () => {
         </DialogDescription>
       </DialogHeader>
 
-      <div class="space-y-6">
-        <!-- Campos Básicos -->
-        <AccommodationBasicFields
-          :errors="errors"
-          :form-data="formData"
-          @update:code="(val) => (formData.code = val)"
-          @update:name="(val) => (formData.name = val)"
-          @update:address="(val) => (formData.address = val)"
-          @update:status="(val) => (formData.status = val)"
-          @update:notes="(val) => (formData.notes = val)"
-        />
+      <form class="space-y-6" @submit="onSubmit">
+        <!-- Campos Básicos con validación automática -->
+        <AccommodationBasicFields />
 
-        <!-- Configuración de Áreas -->
+        <!-- Configuración de Áreas (validación en submit) -->
         <AccommodationAreasConfig
           v-model:selected-areas="selectedAreas"
           v-model:selected-elements="selectedElements"
           :area-catalog="areaCatalogStore.areas"
           :element-catalog-map="elementCatalogMap"
         />
-      </div>
 
-      <DialogFooter>
-        <Button variant="outline" @click="isDialogOpen = false">
-          Cancelar
-        </Button>
-        <Button :disabled="isSubmitting" @click="handleSubmit">
-          <Spinner v-if="isSubmitting" class="mr-2 h-4 w-4" />
-          {{ isSubmitting ? 'Creando...' : 'Crear Alojamiento' }}
-        </Button>
-      </DialogFooter>
+        <DialogFooter>
+          <Button type="button" variant="outline" @click="isDialogOpen = false"> Cancelar </Button>
+
+          <!-- Deshabilitar hasta que el formulario sea válido -->
+          <Button :disabled="isSubmitting || !isFormValid" type="submit">
+            <Spinner v-if="isSubmitting" class="mr-2 h-4 w-4" />
+            {{ isSubmitting ? 'Creando...' : 'Crear Alojamiento' }}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   </Dialog>
 </template>
