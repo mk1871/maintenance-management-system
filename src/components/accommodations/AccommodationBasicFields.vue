@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -19,51 +18,73 @@ import {
 } from '@/components/ui/form'
 
 /**
- * Componente para campos básicos del formulario de Accommodation
- * Usa FormField de shadcn-vue para validación automática
- * No recibe props, se conecta automáticamente al formulario padre
+ * Campos básicos del formulario de Accommodation
+ * Layout optimizado basado en mejores prácticas de UX
+ * Fuente: Baymard Institute, WPForms, HubSpot
  */
 </script>
 
 <template>
   <div class="space-y-4">
-    <!-- Código del Alojamiento -->
-    <FormField v-slot="{ componentField }" name="code">
-      <FormItem>
-        <FormLabel>Código *</FormLabel>
-        <FormControl>
-          <Input
-            class="uppercase"
-            maxlength="4"
-            placeholder="Ej: A101"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormDescription>
-          Código único del alojamiento (1-4 caracteres, solo mayúsculas y números)
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <!-- Fila 1: Código + Nombre (campos relacionados) -->
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+      <!-- Código: 2 columnas (corto) -->
+      <div class="md:col-span-3">
+        <FormField v-slot="{ componentField }" name="code">
+          <FormItem>
+            <FormLabel>Código *</FormLabel>
+            <FormControl>
+              <Input
+                class="uppercase"
+                maxlength="4"
+                placeholder="A101"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
 
-    <!-- Nombre del Alojamiento -->
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>Nombre *</FormLabel>
-        <FormControl>
-          <Input
-            placeholder="Ej: Apartamento Playa Vista"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormDescription>
-          Nombre descriptivo del alojamiento (mínimo 3 caracteres)
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <!-- Nombre: 6 columnas (principal) -->
+      <div class="md:col-span-6">
+        <FormField v-slot="{ componentField }" name="name">
+          <FormItem>
+            <FormLabel>Nombre *</FormLabel>
+            <FormControl>
+              <Input
+                placeholder="Ej: Apartamento Playa Vista"
+                v-bind="componentField"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
 
-    <!-- Dirección -->
+      <!-- Estado: 3 columnas (dropdown) -->
+      <div class="md:col-span-3">
+        <FormField v-slot="{ componentField }" name="status">
+          <FormItem>
+            <FormLabel>Estado *</FormLabel>
+            <Select v-bind="componentField">
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="active">Activo</SelectItem>
+                <SelectItem value="inactive">Inactivo</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
+    </div>
+
+    <!-- Fila 2: Dirección (puede compartir si es necesario) -->
     <FormField v-slot="{ componentField }" name="address">
       <FormItem>
         <FormLabel>Dirección</FormLabel>
@@ -73,49 +94,22 @@ import {
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>
-          Dirección física del alojamiento (opcional)
-        </FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
-    <!-- Estado -->
-    <FormField v-slot="{ componentField }" name="status">
-      <FormItem>
-        <FormLabel>Estado *</FormLabel>
-        <Select v-bind="componentField">
-          <FormControl>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona el estado" />
-            </SelectTrigger>
-          </FormControl>
-          <SelectContent>
-            <SelectItem value="active">Activo</SelectItem>
-            <SelectItem value="inactive">Inactivo</SelectItem>
-          </SelectContent>
-        </Select>
-        <FormDescription>
-          Estado operativo del alojamiento
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <!-- Notas -->
+    <!-- Fila 3: Notas (textarea siempre ancho completo) -->
     <FormField v-slot="{ componentField }" name="notes">
       <FormItem>
         <FormLabel>Notas</FormLabel>
         <FormControl>
           <Textarea
-            placeholder="Notas adicionales sobre el alojamiento..."
+            class="resize-none"
+            placeholder="Información adicional..."
             rows="3"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>
-          Información adicional sobre el alojamiento (opcional)
-        </FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
